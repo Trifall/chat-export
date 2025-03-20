@@ -1,0 +1,94 @@
+{
+  "private": true,
+  "scripts": {
+    "prepare": "husky",
+    "prebuild": "rm -rf dist",
+    "build": "NODE_NO_WARNINGS=1 parcel build --config @parcel/config-webextension",
+    "watch": "NODE_NO_WARNINGS=1 parcel watch --no-hmr --config @parcel/config-webextension",
+    "lint": "run-p lint:*",
+    "lint:typescript": "tsc --noEmit",
+    "lint:eslint": "eslint .",
+    "lint:prettier": "prettier --check .",
+    "fix": "run-p fix:*",
+    "fix:eslint": "npm run lint:eslint -- --fix",
+    "fix:prettier": "npm run lint:prettier -- --write",
+    "test": "run-p lint:* build",
+    "e2e": "playwright test",
+    "cm": "cz"
+  },
+  "dependencies": {
+    "@radix-ui/react-label": "^2.1.1",
+    "@radix-ui/react-slider": "^1.2.2",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.479.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "webext-options-sync": "^4.3.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@commitlint/types": "^19.5.0",
+    "@eslint/js": "^9.17.0",
+    "@parcel/config-webextension": "^2.13.0",
+    "@parcel/resolver-default": "^2.13.0",
+    "@playwright/test": "^1.49.1",
+    "@types/chrome": "^0.0.310",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@types/webextension-polyfill": "^0.12.1",
+    "class-variance-authority": "^0.7.1",
+    "commitizen": "^4.3.1",
+    "cz-conventional-changelog": "^3.3.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^10.0.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-tailwindcss": "^3.17.5",
+    "globals": "^16.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.11",
+    "npm-run-all2": "^7.0.1",
+    "parcel": "^2.13.0",
+    "postcss": "^8.4.49",
+    "prettier": "3.5.3",
+    "process": "^0.11.10",
+    "tailwind-merge": "^3.0.0",
+    "tailwindcss": "^3.4.17",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "webextension-polyfill": "^0.12.0"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
+  },
+  "@parcel/resolver-default": {
+    "packageExports": true
+  },
+  "targets": {
+    "default": {
+      "source": "src/manifest.json",
+      "distDir": "./dist"
+    }
+  },
+  "webExt": {
+    "sourceDir": "dist",
+    "run": {
+      "startUrl": [
+        "https://github.com/fregante/browser-extension-template"
+      ]
+    }
+  },
+  "postcss": {
+    "plugins": {
+      "tailwindcss": {}
+    }
+  },
+  "lint-staged": {
+    "*": "prettier --write --ignore-unknown",
+    "*.{js,jsx,ts,tsx}": "eslint --fix"
+  }
+}
