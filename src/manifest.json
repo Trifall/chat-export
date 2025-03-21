@@ -1,37 +1,40 @@
 {
   "$schema": "https://json.schemastore.org/chrome-manifest",
-  "name": "Awesome Extension",
-  "version": "0.0.0",
-  "description": "An awesome new browser extension",
-  "homepage_url": "https://github.com/fregante/browser-extension-template",
+  "name": "ChatGPT Export",
+  "version": "0.0.1",
+  "description": "Export ChatGPT conversations to markdown",
   "manifest_version": 3,
   "minimum_chrome_version": "121",
   "browser_specific_settings": {
     "gecko": {
-      "id": "awesome-extension@notlmn.github.io",
+      "id": "chatgpt-export@extension",
       "strict_min_version": "109.0"
     }
   },
   "icons": {
     "128": "icon.png"
   },
-  "permissions": ["storage"],
-  "host_permissions": ["https://github.com/*"],
+  "permissions": ["storage", "clipboardWrite", "clipboardRead"],
+  "host_permissions": ["https://chat.openai.com/*"],
   "content_scripts": [
     {
-      "matches": ["https://github.com/fregante/browser-extension-template/*"],
+      "matches": ["https://chat.openai.com/*", "https://chatgpt.com/*"],
       "js": ["content.ts"],
       "css": ["content.css"],
       "run_at": "document_end"
     }
   ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
   },
   "background": {
     "service_worker": "background.ts",
-    "type": "module",
-    "scripts": ["background.ts"]
+    "scripts": ["background.ts"],
+    "type": "module"
   }
 }

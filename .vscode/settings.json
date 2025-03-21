@@ -1,0 +1,34 @@
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "tsconfig.json": "tsconfig.*.json, env.d.ts",
+    "vite.config.*": "jsconfig*, vitest.config.*, cypress.config.*, playwright.config.*",
+    "package.json": "package-lock.json, pnpm*, .yarnrc*, yarn*, .eslint*, eslint*, .prettier*, prettier*, .editorconfig, .gitattributes, bun.lock, .npmrc, postcss.config.js, .gitignore, jsconfig.json, next-env.d.ts, contentlayer.config.ts"
+  },
+  "files.watcherExclude": {
+    "**/.next/*/**": true,
+    "pnpm-lock.yaml": true,
+    "package-lock.json": true
+  },
+  "search.exclude": {
+    "**/.next/**": true,
+    "pnpm-lock.yaml": true,
+    "package-lock.json": true
+  },
+  // use LF line endings
+  "files.eol": "\n",
+  // small performance improvements
+  "editor.minimap.renderCharacters": false,
+  // set prettier as default formatter for json, ts, js, html, css
+  "[json][jsonc][typescript][javascript][html][css]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  // set prettier as default formatter for md, mdx, yml, yaml
+  "[markdown][mdx][yml][yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}

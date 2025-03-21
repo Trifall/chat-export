@@ -1,10 +1,14 @@
 import OptionsSync from "webext-options-sync";
 
-export const defaultOptions = {
-  colorRed: 255,
-  colorGreen: 128,
-  colorBlue: 64,
-  text: "Set a text!",
+export type ExportType = "markdown" | "xml" | "json" | "html";
+
+export interface Options {
+  exportType: ExportType;
+  [key: string]: string;
+}
+
+export const defaultOptions: Options = {
+  exportType: "markdown",
 };
 
 const optionsStorage = new OptionsSync({
