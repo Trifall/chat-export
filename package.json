@@ -70,7 +70,8 @@
     "sourceDir": "dist",
     "run": {
       "startUrl": [
-        "https://chatgpt.com"
+        "https://chatgpt.com",
+        "https://claude.ai"
       ]
     }
   },

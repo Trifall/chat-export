@@ -1,13 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/chrome-manifest",
-  "name": "ChatGPT Export",
+  "name": "LLM Export",
   "version": "0.0.1",
-  "description": "Export ChatGPT conversations to markdown",
+  "description": "Export LLM conversations to markdown",
   "manifest_version": 3,
   "minimum_chrome_version": "121",
   "browser_specific_settings": {
     "gecko": {
-      "id": "chatgpt-export@extension",
+      "id": "llm-export@extension",
       "strict_min_version": "109.0"
     }
   },
@@ -18,7 +18,7 @@
   "host_permissions": ["https://chat.openai.com/*"],
   "content_scripts": [
     {
-      "matches": ["https://chat.openai.com/*", "https://chatgpt.com/*"],
+      "matches": ["https://chat.openai.com/*", "https://chatgpt.com/*", "https://claude.ai/*"],
       "js": ["content.ts"],
       "css": ["content.css"],
       "run_at": "document_end"
