@@ -4,37 +4,77 @@ import optionsStorage from './options-storage'
 
 console.log('💈 Content script loaded for', browser.runtime.getManifest().name)
 
+type Site = 'chatgpt' | 'claude'
+
+const CLAUDE_URLS = ['https://claude.ai']
+const CHATGPT_URLS = ['https://chat.openai.com', 'https://chatgpt.com']
+
+function detectSite(): Site {
+  const url = window.location.href
+  if (CHATGPT_URLS.some((u) => url.includes(u))) {
+    return 'chatgpt'
+  }
+  if (CLAUDE_URLS.some((u) => url.includes(u))) {
+    return 'claude'
+  }
+  throw new Error('Unsupported site')
+}
+
 function createExportButton(): HTMLElement {
+  const site = detectSite()
   const buttonContainer = document.createElement('div')
   buttonContainer.className = 'relative'
 
   const button = document.createElement('button')
-  button.className = 'btn relative btn-secondary text-token-text-primary'
+
+  if (site === 'claude') {
+    // Match Claude's button style
+    button.className = `inline-flex items-center justify-center relative shrink-0 ring-offset-2 ring-offset-bg-300 
+      ring-accent-main-100 focus-visible:outline-none focus-visible:ring-1 disabled:pointer-events-none 
+      disabled:opacity-50 disabled:shadow-none disabled:drop-shadow-none bg-[radial-gradient(ellipse,_var(--tw-gradient-stops))] 
+      from-bg-500/10 from-50% to-bg-500/30 border-0.5 border-border-400 font-medium font-styrene text-text-100/90 
+      transition-colors active:bg-bg-500/50 hover:text-text-000 hover:bg-bg-500/60 h-9 px-4 py-2 rounded-lg min-w-[5rem] 
+      active:scale-[0.985] whitespace-nowrap`
+    buttonContainer.className = 'mr-1'
+  } else {
+    // Original ChatGPT style
+    button.className = 'btn relative btn-secondary text-token-text-primary'
+  }
+
   button.setAttribute('aria-label', 'Export')
   button.setAttribute('data-testid', 'export-chat-button')
 
   const buttonContent = document.createElement('div')
-  buttonContent.className = 'flex w-full items-center justify-center gap-1.5'
+  buttonContent.className =
+    site === 'claude' ? '' : 'flex w-full items-center justify-center gap-1.5'
 
-  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-  icon.setAttribute('width', '20')
-  icon.setAttribute('height', '20')
-  icon.setAttribute('viewBox', '0 0 20 20')
-  icon.setAttribute('fill', 'none')
-  icon.classList.add('icon-sm')
+  if (site === 'chatgpt') {
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    icon.setAttribute('width', '20')
+    icon.setAttribute('height', '20')
+    icon.setAttribute('viewBox', '0 0 20 20')
+    icon.setAttribute('fill', 'none')
+    icon.classList.add('icon-sm')
 
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-  path.setAttribute('d', 'M3 17h14v-6h2v8H1v-8h2v6zm7-7V2h4l-5-5-5 5h4v8z')
-  path.setAttribute('stroke', 'currentColor')
-  path.setAttribute('stroke-width', '1.5')
-  path.setAttribute('stroke-linecap', 'round')
-  path.setAttribute('stroke-linejoin', 'round')
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    path.setAttribute('d', 'M3 17h14v-6h2v8H1v-8h2v6zm7-7V2h4l-5-5-5 5h4v8z')
+    path.setAttribute('stroke', 'currentColor')
+    path.setAttribute('stroke-width', '1.5')
+    path.setAttribute('stroke-linecap', 'round')
+    path.setAttribute('stroke-linejoin', 'round')
 
-  icon.appendChild(path)
-  buttonContent.appendChild(icon)
+    icon.appendChild(path)
+    buttonContent.appendChild(icon)
+  }
+
+  if (site === 'claude') {
+    buttonContainer.style.position = 'relative'
+  }
+
   buttonContent.appendChild(document.createTextNode('Export'))
   button.appendChild(buttonContent)
   buttonContainer.appendChild(button)
+  console.log(`buttonContainer outerHTML: ${buttonContainer.outerHTML}`)
 
   // make dropdown
   const dropdown = document.createElement('div')
@@ -173,14 +213,15 @@ async function formatContent(
 }
 
 async function forceLoadMessages(): Promise<void> {
+  const site = detectSite()
+  if (site !== 'chatgpt') return
+
   // get the first conversation turn
   const turns = document.querySelectorAll('article.group\\/turn') as NodeListOf<HTMLElement>
   if (!turns.length) return
 
   const firstTurn = turns[0]
   if (!firstTurn) return
-
-  console.log(`First turn found: ${firstTurn.outerHTML}`)
 
   // scroll to the first turn
   firstTurn.scrollIntoView({
@@ -193,7 +234,6 @@ async function forceLoadMessages(): Promise<void> {
 
   // find the last conversation turn
   const lastTurn = turns[turns.length - 1]
-  console.log(`Last turn found: ${lastTurn?.outerHTML}`)
 
   if (!lastTurn) return
 
@@ -207,23 +247,44 @@ async function forceLoadMessages(): Promise<void> {
 }
 
 async function getChatContent(): Promise<{ format: string; content: string }> {
-  // force load all messages first
-  await forceLoadMessages()
-
-  const turns = document.querySelectorAll('[data-testid^="conversation-turn-"]')
+  const site = detectSite()
   const messages: Array<{ role: string; content: string }> = []
   const originalClipboard = await navigator.clipboard.readText()
 
-  for (const turn of turns) {
-    const messageDiv = turn.querySelector('[data-message-author-role]')
-    if (!messageDiv) continue
+  if (site === 'chatgpt') {
+    await forceLoadMessages()
+    const turns = document.querySelectorAll('[data-testid^="conversation-turn-"]')
 
-    const role = messageDiv.getAttribute('data-message-author-role')
-    const copyButton = turn.querySelector(
-      '[data-testid="copy-turn-action-button"]'
-    ) as HTMLButtonElement
+    for (const turn of turns) {
+      const messageDiv = turn.querySelector('[data-message-author-role]')
+      if (!messageDiv) continue
 
-    if (copyButton && role) {
+      const role = messageDiv.getAttribute('data-message-author-role')
+      const copyButton = turn.querySelector(
+        '[data-testid="copy-turn-action-button"]'
+      ) as HTMLButtonElement
+
+      if (copyButton && role) {
+        copyButton.click()
+        // wait for clipboard to be updated
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        const content = await navigator.clipboard.readText()
+        messages.push({ role, content })
+      }
+    }
+  } else {
+    // Claude.ai
+    const messageDivs = document.querySelectorAll('div.font-claude-message, div.font-user-message')
+
+    for (const div of messageDivs) {
+      const role = div.classList.contains('font-claude-message') ? 'assistant' : 'user'
+      // Find the copy button in the sibling absolute container
+      const container = div.nextElementSibling as HTMLElement
+      if (!container || !container.classList.contains('absolute')) continue
+
+      const copyButton = container.querySelector('button[data-state="closed"]') as HTMLButtonElement
+      if (!copyButton) continue
+
       copyButton.click()
       // wait for clipboard to be updated
       await new Promise((resolve) => setTimeout(resolve, 100))
@@ -276,14 +337,29 @@ async function saveToFile() {
 }
 
 function init() {
-  // mutation observer for share button
+  const site = detectSite()
+
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.addedNodes.length) {
-        const shareButton = document.querySelector('[data-testid="share-chat-button"]')
-        if (shareButton && !document.querySelector('[data-testid="export-chat-button"]')) {
-          const exportButton = createExportButton()
-          shareButton.parentElement?.insertBefore(exportButton, shareButton)
+        if (site === 'claude') {
+          // for Claude.ai, look for the share button container
+          const shareButtonContainer = document.querySelector('button[data-testid="share-button"]')
+            ?.parentElement?.parentElement
+          if (
+            shareButtonContainer &&
+            !document.querySelector('[data-testid="export-chat-button"]')
+          ) {
+            const exportButton = createExportButton()
+            shareButtonContainer.parentElement?.appendChild(exportButton)
+          }
+        } else {
+          // for ChatGPT, look for the share button
+          const shareButton = document.querySelector('[data-testid="share-chat-button"]')
+          if (shareButton && !document.querySelector('[data-testid="export-chat-button"]')) {
+            const exportButton = createExportButton()
+            shareButton.parentElement?.insertBefore(exportButton, shareButton)
+          }
         }
       }
     })
