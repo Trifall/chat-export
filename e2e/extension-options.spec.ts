@@ -1,10 +1,11 @@
-import { test } from "./extention-fixtures";
+import { test } from './extention-fixtures'
+
 // import { defaultOptions } from "../src/options-storage";
 
-test.describe("Chrome Extension Options Page", () => {
+test.describe('Chrome Extension Options Page', () => {
   test.beforeEach(async ({ page, extensionId, optionsPage }) => {
-    await page.goto(`chrome-extension://${extensionId}/${optionsPage}`);
-  });
+    await page.goto(`chrome-extension://${extensionId}/${optionsPage}`)
+  })
 
   // test("should have default input values", async ({ page }) => {
   //   const colorRedInput = page.locator('input[type="number"][name="colorRed"]');
@@ -58,4 +59,4 @@ test.describe("Chrome Extension Options Page", () => {
   //   await expect(colorBlueInput).toHaveValue("0");
   //   await expect(textInput).toHaveValue("Test notice content");
   // });
-});
+})

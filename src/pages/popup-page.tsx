@@ -1,24 +1,25 @@
-import { Label } from "@/components/ui/label";
-import "@/global.css";
-import optionsStorage, { ExportType } from "@/options-storage";
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react'
+
+import { Label } from '@/components/ui/label'
+import '@/global.css'
+import optionsStorage, { ExportType } from '@/options-storage'
 
 export default function PopupPage() {
-  const [exportType, setExportType] = useState<ExportType>("markdown");
+  const [exportType, setExportType] = useState<ExportType>('markdown')
 
   useEffect(() => {
     optionsStorage.getAll().then((options) => {
       if (options.exportType) {
-        setExportType(options.exportType as ExportType);
+        setExportType(options.exportType as ExportType)
       }
-    });
-  }, []);
+    })
+  }, [])
 
   const handleExportTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value as ExportType;
-    setExportType(value);
-    optionsStorage.set({ exportType: value });
-  };
+    const value = e.target.value as ExportType
+    setExportType(value)
+    optionsStorage.set({ exportType: value })
+  }
 
   return (
     <div className="w-[300px] bg-zinc-950 p-4 text-zinc-100">
@@ -40,11 +41,9 @@ export default function PopupPage() {
             <option value="json">JSON</option>
             <option value="html">HTML</option>
           </select>
-          <p className="text-sm text-zinc-400">
-            Choose your preferred export format.
-          </p>
+          <p className="text-sm text-zinc-400">Choose your preferred export format.</p>
         </div>
       </div>
     </div>
-  );
+  )
 }

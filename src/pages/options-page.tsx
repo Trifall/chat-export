@@ -1,38 +1,37 @@
-import { Label } from "@/components/ui/label";
+import { useEffect, useState } from 'react'
+
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import "@/global.css";
-import optionsStorage, { ExportType } from "@/options-storage";
-import { useEffect, useState } from "react";
+} from '@/components/ui/select'
+import '@/global.css'
+import optionsStorage, { ExportType } from '@/options-storage'
 
 export default function OptionsPage() {
-  const [exportType, setExportType] = useState<ExportType>("markdown");
+  const [exportType, setExportType] = useState<ExportType>('markdown')
 
   useEffect(() => {
     optionsStorage.getAll().then((options) => {
       if (options.exportType) {
-        setExportType(options.exportType as ExportType);
+        setExportType(options.exportType as ExportType)
       }
-    });
-  }, []);
+    })
+  }, [])
 
   const handleExportTypeChange = (value: ExportType) => {
-    setExportType(value);
-    optionsStorage.set({ exportType: value });
-  };
+    setExportType(value)
+    optionsStorage.set({ exportType: value })
+  }
 
   return (
     <div id="root" className="min-h-screen !bg-zinc-950 text-zinc-100">
       <div id="container" className="container mx-auto max-w-2xl p-4">
         <div className="space-y-0.5">
-          <h1 className="text-2xl font-bold tracking-tight">
-            ChatGPT Export Settings
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">ChatGPT Export Settings</h1>
           <p className="text-sm text-zinc-400">
             Configure how your chat exports will be formatted.
           </p>
@@ -83,5 +82,5 @@ export default function OptionsPage() {
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -1,20 +1,20 @@
-import OptionsSync from "webext-options-sync";
+import OptionsSync from 'webext-options-sync'
 
-export type ExportType = "markdown" | "xml" | "json" | "html";
+export type ExportType = 'markdown' | 'xml' | 'json' | 'html'
 
 export interface Options {
-  exportType: ExportType;
-  [key: string]: string;
+  exportType: ExportType
+  [key: string]: string
 }
 
 export const defaultOptions: Options = {
-  exportType: "markdown",
-};
+  exportType: 'markdown',
+}
 
 const optionsStorage = new OptionsSync({
   defaults: defaultOptions,
   migrations: [OptionsSync.migrations.removeUnused],
   logging: true,
-});
+})
 
-export default optionsStorage;
+export default optionsStorage
