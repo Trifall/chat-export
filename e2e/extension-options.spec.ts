@@ -1,62 +1,47 @@
-import { test } from './extention-fixtures'
+import { expect } from '@playwright/test'
 
-// import { defaultOptions } from "../src/options-storage";
+import { test } from './extention-fixtures'
 
 test.describe('Chrome Extension Options Page', () => {
   test.beforeEach(async ({ page, extensionId, optionsPage }) => {
     await page.goto(`chrome-extension://${extensionId}/${optionsPage}`)
   })
 
-  // test("should have default input values", async ({ page }) => {
-  //   const colorRedInput = page.locator('input[type="number"][name="colorRed"]');
-  //   await expect(colorRedInput).toHaveValue(defaultOptions.colorRed.toString());
+  test('should be able to change the value of the select menu', async ({ page }) => {
+    const select = page.locator('select#export-type')
+    await select.selectOption('xml')
+    await expect(select).toHaveValue('xml')
+    await select.selectOption('html')
+    await expect(select).toHaveValue('html')
+    await select.selectOption('json')
+    await expect(select).toHaveValue('json')
+    await select.selectOption('markdown')
+    await expect(select).toHaveValue('markdown')
+  })
 
-  //   const colorGreenInput = page.locator(
-  //     'input[type="number"][name="colorGreen"]',
-  //   );
-  //   await expect(colorGreenInput).toHaveValue(
-  //     defaultOptions.colorGreen.toString(),
-  //   );
+  test('should store the selected value to storage', async ({ page }) => {
+    const select = page.locator('select#export-type')
 
-  //   const colorBlueInput = page.locator(
-  //     'input[type="number"][name="colorBlue"]',
-  //   );
-  //   await expect(colorBlueInput).toHaveValue(
-  //     defaultOptions.colorBlue.toString(),
-  //   );
+    // change to XML
+    await select.selectOption('xml')
+    await expect(select).toHaveValue('xml')
 
-  //   const textInput = page.locator('input[type="text"][name="text"]');
-  //   await expect(textInput).toHaveValue(defaultOptions.text);
-  // });
+    // wait for the change to take effect
+    await page.waitForTimeout(500)
 
-  // test("should update input values", async ({ page }) => {
-  //   const colorRedInput = page.locator('input[type="number"][name="colorRed"]');
-  //   await page.waitForTimeout(1000);
-  //   await colorRedInput.fill("0");
+    // reload the page to verify that the value was saved
+    await page.reload()
+    await page.waitForSelector('select#export-type')
+    await expect(select).toHaveValue('xml')
 
-  //   const colorGreenInput = page.locator(
-  //     'input[type="number"][name="colorGreen"]',
-  //   );
-  //   await page.waitForTimeout(1000);
-  //   await colorGreenInput.fill("0");
+    // change to HTML
+    await select.selectOption('html')
+    await expect(select).toHaveValue('html')
+    await page.waitForTimeout(500)
 
-  //   const colorBlueInput = page.locator(
-  //     'input[type="number"][name="colorBlue"]',
-  //   );
-  //   await page.waitForTimeout(1000);
-  //   await colorBlueInput.fill("0");
-
-  //   const textInput = page.locator('input[type="text"][name="text"]');
-  //   await page.waitForTimeout(1000);
-  //   await textInput.fill("Test notice content");
-
-  //   // Reload the page to see the changes
-  //   await page.reload();
-
-  //   // Check if the values are updated after reloading the page
-  //   await expect(colorRedInput).toHaveValue("0");
-  //   await expect(colorGreenInput).toHaveValue("0");
-  //   await expect(colorBlueInput).toHaveValue("0");
-  //   await expect(textInput).toHaveValue("Test notice content");
-  // });
+    // reload the page again to verify the new value was saved
+    await page.reload()
+    await page.waitForSelector('select#export-type')
+    await expect(select).toHaveValue('html')
+  })
 })
