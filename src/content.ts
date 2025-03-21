@@ -4,6 +4,8 @@ import optionsStorage from './options-storage'
 
 console.log('💈 Content script loaded for', browser.runtime.getManifest().name)
 
+const SURROUND_PASTE_FILE_IN_BACKTICKS = true
+
 type Site = 'chatgpt' | 'claude'
 
 const CLAUDE_URLS = ['https://claude.ai']
@@ -28,7 +30,7 @@ function createExportButton(): HTMLElement {
   const button = document.createElement('button')
 
   if (site === 'claude') {
-    // Match Claude's button style
+    // match Claude's button style
     button.className = `inline-flex items-center justify-center relative shrink-0 ring-offset-2 ring-offset-bg-300 
       ring-accent-main-100 focus-visible:outline-none focus-visible:ring-1 disabled:pointer-events-none 
       disabled:opacity-50 disabled:shadow-none disabled:drop-shadow-none bg-[radial-gradient(ellipse,_var(--tw-gradient-stops))] 
@@ -37,7 +39,7 @@ function createExportButton(): HTMLElement {
       active:scale-[0.985] whitespace-nowrap`
     buttonContainer.className = 'mr-1'
   } else {
-    // Original ChatGPT style
+    // original ChatGPT style
     button.className = 'btn relative btn-secondary text-token-text-primary'
   }
 
@@ -74,7 +76,6 @@ function createExportButton(): HTMLElement {
   buttonContent.appendChild(document.createTextNode('Export'))
   button.appendChild(buttonContent)
   buttonContainer.appendChild(button)
-  console.log(`buttonContainer outerHTML: ${buttonContainer.outerHTML}`)
 
   // make dropdown
   const dropdown = document.createElement('div')
@@ -246,6 +247,64 @@ async function forceLoadMessages(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 100))
 }
 
+async function getPastedContent(div: Element): Promise<string | null> {
+  // find all file and image elements
+  const fileElements = div.querySelectorAll(
+    'div[data-testid="file-thumbnail"]'
+  ) as NodeListOf<HTMLElement>
+  const imageElements = div.querySelectorAll('img') as NodeListOf<HTMLImageElement>
+  if (!fileElements.length && !imageElements.length) return null
+
+  const contents: string[] = []
+
+  // handle files
+  for (let i = 0; i < fileElements.length; i++) {
+    // click to open side panel
+    const clickableDiv = fileElements[i]
+    if (clickableDiv) clickableDiv.click()
+    await new Promise((resolve) => setTimeout(resolve, 500)) // wait for panel to open
+
+    // find the content in the side panel
+    const contentElement = document.querySelector('.whitespace-pre-wrap.break-all.text-xs')
+    if (!contentElement) {
+      // close the panel if we couldn't find the content
+      const closeButton = document.querySelector(
+        'button[data-testid="close-file-preview"]'
+      ) as HTMLElement
+      if (closeButton) closeButton.click()
+      continue // skip this file but continue processing others
+    }
+
+    const fileContent = contentElement.textContent || ''
+    if (fileContent) {
+      if (!SURROUND_PASTE_FILE_IN_BACKTICKS) {
+        contents.push(`\`\`\`\n${fileContent}\n\`\`\`\n`)
+      } else {
+        contents.push(fileContent)
+      }
+    }
+
+    // close the panel
+    const closeButton = document.querySelector(
+      'button[data-testid="close-file-preview"]'
+    ) as HTMLElement
+    if (closeButton) closeButton.click()
+  }
+
+  // handle images
+  for (let i = 0; i < imageElements.length; i++) {
+    const imageElement = imageElements[i]
+    const imageContent = formatImageInput(imageElement.src, imageElement.alt)
+    contents.push(imageContent)
+  }
+
+  return contents.length > 0 ? contents.join('\n') : null
+}
+
+function formatImageInput(src: string, name: string): string {
+  return `User included image: ${name ?? 'Name not provided'} - ${src ?? 'Unable to retrieve URL'}\n`
+}
+
 async function getChatContent(): Promise<{ format: string; content: string }> {
   const site = detectSite()
   const messages: Array<{ role: string; content: string }> = []
@@ -273,22 +332,73 @@ async function getChatContent(): Promise<{ format: string; content: string }> {
       }
     }
   } else {
-    // Claude.ai
+    // claude.ai
     const messageDivs = document.querySelectorAll('div.font-claude-message, div.font-user-message')
 
     for (const div of messageDivs) {
       const role = div.classList.contains('font-claude-message') ? 'assistant' : 'user'
-      // Find the copy button in the sibling absolute container
-      const container = div.nextElementSibling as HTMLElement
-      if (!container || !container.classList.contains('absolute')) continue
+      let content = ''
 
-      const copyButton = container.querySelector('button[data-state="closed"]') as HTMLButtonElement
-      if (!copyButton) continue
+      if (role === 'assistant') {
+        // for assistant messages, use the copy button approach
+        const container = div.nextElementSibling as HTMLElement
+        if (!container || !container.classList.contains('absolute')) continue
 
-      copyButton.click()
-      // wait for clipboard to be updated
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      const content = await navigator.clipboard.readText()
+        const copyButton = container.querySelector(
+          'button[data-state="closed"]'
+        ) as HTMLButtonElement
+        if (!copyButton) continue
+
+        copyButton.click()
+        // wait for clipboard to be updated
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        content = await navigator.clipboard.readText()
+      } else {
+        // for user messages, handle regular text, code blocks, and pasted content
+        const messageParts: string[] = []
+
+        // get all direct children
+        const children = Array.from(div.children)
+
+        // look for pasted content first
+        const pastedDiv = div.parentElement?.parentElement?.previousElementSibling?.querySelector(
+          'div.group\\/thumbnail.relative'
+        )?.parentElement as HTMLElement
+
+        if (pastedDiv) {
+          const pastedContent = await getPastedContent(pastedDiv)
+          if (pastedContent) {
+            messageParts.push(pastedContent)
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
+        }
+
+        for (const child of children) {
+          if (child.tagName === 'P') {
+            // regular text content
+            const text = child.textContent?.trim()
+            if (text) messageParts.push(text)
+          } else {
+            // if it's a code block, try copy button
+            if (child.classList.contains('relative')) {
+              const copyButton = child.querySelector(
+                'button[data-state="closed"]'
+              ) as HTMLButtonElement
+              if (copyButton) {
+                copyButton.click()
+                // wait for clipboard to be updated
+                await new Promise((resolve) => setTimeout(resolve, 100))
+                const copiedContent = await navigator.clipboard.readText()
+                if (copiedContent) messageParts.push(copiedContent)
+              }
+            }
+          }
+        }
+
+        content = messageParts.join('\n')
+        if (!content) continue
+      }
+
       messages.push({ role, content })
     }
   }
