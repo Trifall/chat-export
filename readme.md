@@ -1,14 +1,10 @@
 # browser-extension-template
 
-[link-rgh]: https://github.com/sindresorhus/refined-github
-[link-ngh]: https://github.com/sindresorhus/notifier-for-github
-[link-hfog]: https://github.com/sindresorhus/hide-files-on-github
-[link-tsconfig]: https://github.com/sindresorhus/tsconfig
 [link-options-sync]: https://github.com/fregante/webext-options-sync
 [link-cws-keys]: https://github.com/fregante/chrome-webstore-upload-keys
 [link-amo-keys]: https://addons.mozilla.org/en-US/developers/addon/api/key
 
-[![Test](https://github.com/sotayamashita/browser-extension-template/actions/workflows/test.yml/badge.svg)](https://github.com/sotayamashita/browser-extension-template/actions/workflows/test.yml) [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fsotayamashita%2Fbrowser-extension-template.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fsotayamashita%2Fbrowser-extension-template?ref=badge_shield&issueType=license) [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)](https://github.com/prettier/prettier) [![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
+[![Test](https://github.com/sotayamashita/browser-extension-template/actions/workflows/test.yml/badge.svg)](https://github.com/sotayamashita/browser-extension-template/actions/workflows/test.yml) [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fsotayamashita%2Fbrowser-extension-template.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fsotayamashita%2Fbrowser-extension-template?ref=badge_shield&issueType=license) [![code style: prettier](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)](https://github.com/prettier/prettier)
 
 > Cross-browser extension boilerplate - barebones template with Parcel 2, options handler and auto-publishing.
 
@@ -30,7 +26,6 @@ Screenshot of extension options:
 - stylelint
 + React
 + TypeScript
-+ with commitizen for commit messages
 + with Prettier / Husky / lint-staged for linting
 + with Playwright for E2E tests
 + with Shadcn/UI and TailwindCSS for UI Components
@@ -39,7 +34,6 @@ Screenshot of extension options:
 Related PRs:
 
 - Remove xo, eslint, and stylelint [#5](https://github.com/sotayamashita/browser-extension-template/pull/5)
-- Add commitizen [#30](https://github.com/sotayamashita/browser-extension-template/pull/30) [#32](https://github.com/sotayamashita/browser-extension-template/pull/32)
 - Add Prettier, husky and lint-staged [#8](https://github.com/sotayamashita/browser-extension-template/pull/8)
 - Add Playwright for E2E tests [#11](https://github.com/sotayamashita/browser-extension-template/pull/11)
 - Add TypeScript [#17](https://github.com/sotayamashita/browser-extension-template/pull/17)
