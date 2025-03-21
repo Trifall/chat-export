@@ -1,4 +1,5 @@
 import browser from "webextension-polyfill";
+import optionsStorage from "./options-storage";
 
 console.log("💈 Content script loaded for", browser.runtime.getManifest().name);
 
@@ -74,11 +75,72 @@ function createExportButton(): HTMLElement {
   return buttonContainer;
 }
 
-async function getChatContent(): Promise<string> {
+async function formatContent(
+  messages: Array<{ role: string; content: string }>,
+  format: string,
+): Promise<string> {
+  switch (format) {
+    case "markdown":
+      return messages
+        .map(
+          ({ role, content }) =>
+            `### ${role === "assistant" ? "Assistant" : "User"}\n\n${content}\n\n`,
+        )
+        .join("");
+
+    case "json":
+      return JSON.stringify(
+        {
+          messages: messages.map(({ role, content }) => ({
+            role: role === "assistant" ? "assistant" : "user",
+            content,
+          })),
+        },
+        null,
+        2,
+      );
+
+    case "xml":
+      return `<?xml version="1.0" encoding="UTF-8"?>\n<conversation>\n${messages
+        .map(
+          ({ role, content }) =>
+            `  <message role="${role === "assistant" ? "assistant" : "user"}">\n    <content>${content
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&apos;")}</content>\n  </message>`,
+        )
+        .join("\n")}\n</conversation>`;
+
+    case "html":
+      return `<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="UTF-8">\n  <title>Chat Export</title>\n  <style>\n    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }\n    .message { margin-bottom: 2rem; }\n    .role { font-weight: bold; margin-bottom: 0.5rem; }\n    .content { white-space: pre-wrap; }\n  </style>\n</head>\n<body>\n${messages
+        .map(
+          ({ role, content }) =>
+            `  <div class="message">\n    <div class="role">${role === "assistant" ? "Assistant" : "User"}</div>\n    <div class="content">${content
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&apos;")}</div>\n  </div>`,
+        )
+        .join("\n")}\n</body>\n</html>`;
+
+    default:
+      return messages
+        .map(
+          ({ role, content }) =>
+            `### ${role === "assistant" ? "Assistant" : "User"}\n\n${content}\n\n`,
+        )
+        .join("");
+  }
+}
+
+async function getChatContent(): Promise<{ format: string; content: string }> {
   const turns = document.querySelectorAll(
     '[data-testid^="conversation-turn-"]',
   );
-  let markdown = "";
+  const messages: Array<{ role: string; content: string }> = [];
   const originalClipboard = await navigator.clipboard.readText();
 
   for (const turn of turns) {
@@ -95,27 +157,47 @@ async function getChatContent(): Promise<string> {
       // wait for clipboard to be updated
       await new Promise((resolve) => setTimeout(resolve, 100));
       const content = await navigator.clipboard.readText();
-      markdown += `### ${role === "assistant" ? "Assistant" : "User"}\n\n${content}\n\n`;
+      messages.push({ role, content });
     }
   }
 
   // restore original clipboard content
   await navigator.clipboard.writeText(originalClipboard);
-  return markdown;
+
+  // get user's preferred format
+  const options = await optionsStorage.getAll();
+  const format = options.exportType || "markdown";
+
+  const formattedContent = await formatContent(messages, format);
+  return { format, content: formattedContent };
 }
 
 async function copyToClipboard() {
-  const content = await getChatContent();
+  const { content } = await getChatContent();
   await navigator.clipboard.writeText(content);
 }
 
 async function saveToFile() {
-  const content = await getChatContent();
-  const blob = new Blob([content], { type: "text/markdown" });
+  const { format, content } = await getChatContent();
+  const mimeTypes: { [key: string]: string } = {
+    markdown: "text/markdown",
+    json: "application/json",
+    xml: "application/xml",
+    html: "text/html",
+  };
+
+  const extensions: { [key: string]: string } = {
+    markdown: "md",
+    json: "json",
+    xml: "xml",
+    html: "html",
+  };
+
+  const blob = new Blob([content], { type: mimeTypes[format] || "text/plain" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `chat-export-${new Date().toISOString().split("T")[0]}.md`;
+  a.download = `chat-export-${new Date().toISOString().split("T")[0]}.${extensions[format] || "txt"}`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
