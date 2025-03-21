@@ -231,7 +231,7 @@ async function forceLoadMessages(): Promise<void> {
   })
 
   // wait for any new messages to load
-  await new Promise((resolve) => setTimeout(resolve, 1000))
+  await new Promise((resolve) => setTimeout(resolve, 500))
 
   // find the last conversation turn
   const lastTurn = turns[turns.length - 1]
@@ -322,12 +322,23 @@ async function getChatContent(): Promise<{ format: string; content: string }> {
       const copyButton = turn.querySelector(
         '[data-testid="copy-turn-action-button"]'
       ) as HTMLButtonElement
+      const images = turn.querySelectorAll('img')
 
-      if (copyButton && role) {
-        copyButton.click()
-        // wait for clipboard to be updated
-        await new Promise((resolve) => setTimeout(resolve, 100))
-        const content = await navigator.clipboard.readText()
+      if (role) {
+        let content = ''
+
+        for (const image of images) {
+          const imageContent = formatImageInput(image.src, image.alt)
+          content += imageContent + '\n'
+        }
+
+        if (copyButton) {
+          copyButton.click()
+          // wait for clipboard to be updated
+          await new Promise((resolve) => setTimeout(resolve, 100))
+          content += await navigator.clipboard.readText()
+        }
+
         messages.push({ role, content })
       }
     }
