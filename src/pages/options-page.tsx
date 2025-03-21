@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 
-import { Label } from '@/components/ui/label'
 import '@/global.css'
 import optionsStorage, { ExportType } from '@/options-storage'
 
@@ -32,7 +31,7 @@ export default function OptionsPage() {
         </div>
         <div className="mt-4 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="export-type">Format</Label>
+            <label htmlFor="export-type">Format</label>
             <select
               id="export-type"
               value={exportType}

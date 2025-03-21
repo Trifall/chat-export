@@ -16,11 +16,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
-    "@radix-ui/react-label": "^2.1.2",
-    "@radix-ui/react-select": "^2.1.6",
-    "@radix-ui/react-slider": "^1.2.2",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.479.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "webext-options-sync": "^4.3.0"
