@@ -37,7 +37,7 @@ function createExportButton(): HTMLElement {
   // make dropdown
   const dropdown = document.createElement("div");
   dropdown.className =
-    "absolute hidden bg-token-main-surface-secondary rounded-md shadow-lg mt-3 py-2 w-48 z-50";
+    "absolute hidden bg-zinc-900 rounded-md shadow-lg mt-3 py-2 w-48 z-50 text-zinc-100";
   dropdown.style.top = "100%";
   dropdown.style.left = "0";
 
@@ -49,7 +49,7 @@ function createExportButton(): HTMLElement {
   options.forEach((option, index) => {
     const item = document.createElement("button");
     item.className =
-      "w-full text-left px-4 py-3 hover:bg-token-main-surface-primary";
+      "w-full text-left px-4 py-3 hover:bg-zinc-800 text-zinc-100";
     item.textContent = option.text;
     item.onclick = option.action;
     if (index > 0) {
