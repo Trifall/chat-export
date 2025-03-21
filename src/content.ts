@@ -277,7 +277,7 @@ async function getPastedContent(div: Element): Promise<string | null> {
 
     const fileContent = contentElement.textContent || ''
     if (fileContent) {
-      if (!SURROUND_PASTE_FILE_IN_BACKTICKS) {
+      if (SURROUND_PASTE_FILE_IN_BACKTICKS) {
         contents.push(`\`\`\`\n${fileContent}\n\`\`\`\n`)
       } else {
         contents.push(fileContent)
