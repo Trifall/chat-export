@@ -25,8 +25,6 @@ ChatGPT Button:
 
 ![ChatGPT Export Button](https://github.com/user-attachments/assets/9a030781-4e8d-47a0-87b2-c15461f08ce4)
 
-
-
 ## Getting started
 
 <!--
