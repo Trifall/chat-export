@@ -14,7 +14,6 @@ export const test = base.extend<{
     const context = await chromium.launchPersistentContext('', {
       headless: false,
       args: [
-        // Enable headless mode when running in CI environment, otherwise run with browser UI
         process.env.CI ? `--headless=new` : '',
         `--disable-extensions-except=${pathToExtension}`,
         `--load-extension=${pathToExtension}`,
@@ -24,10 +23,29 @@ export const test = base.extend<{
     await context.close()
   },
   async extensionId({ context }, use) {
-    let [background] = context.serviceWorkers()
-    background ||= await context.waitForEvent('serviceworker')
+    // Navigate to the extensions page
+    const page = await context.newPage()
+    await page.goto('chrome://extensions/')
 
-    const extensionId = background.url().split('/')[2]
+    // Get the extension ID from the extensions page
+    const extensionId = await page.evaluate(() => {
+      const extensions = document
+        .querySelector('extensions-manager')
+        ?.shadowRoot?.querySelector('extensions-item-list')
+        ?.shadowRoot?.querySelectorAll('extensions-item')
+
+      if (!extensions?.length) return null
+
+      // Get the first (and should be only) extension's ID
+      const extensionItem = extensions[0]
+      return extensionItem.getAttribute('id')
+    })
+
+    if (!extensionId) {
+      throw new Error('Could not find extension ID')
+    }
+
+    await page.close()
     await use(extensionId)
   },
   // eslint-disable-next-line no-empty-pattern
@@ -42,4 +60,5 @@ export const test = base.extend<{
     await use(optionsFile)
   },
 })
+
 export const expect = test.expect
