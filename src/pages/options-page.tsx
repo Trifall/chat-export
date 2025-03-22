@@ -24,7 +24,7 @@ export default function OptionsPage() {
     <div id="root" className="min-h-screen !bg-zinc-950 text-zinc-100">
       <div id="container" className="container mx-auto max-w-2xl p-4">
         <div className="space-y-0.5">
-          <h1 className="text-2xl font-bold tracking-tight">LLM Export Settings</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Chat Export Settings</h1>
           <p className="text-sm text-zinc-400">
             Configure how your chat exports will be formatted.
           </p>

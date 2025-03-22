@@ -1,13 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/chrome-manifest",
-  "name": "LLM Export",
+  "name": "Chat Export",
   "version": "0.0.2",
-  "description": "Export LLM conversations to Markdown, XML, JSON, and HTML",
+  "description": "Export LLM chat conversations to Markdown, XML, JSON, and HTML",
   "manifest_version": 3,
   "minimum_chrome_version": "121",
   "browser_specific_settings": {
     "gecko": {
-      "id": "llm-export@extension",
+      "id": "chat-export@extension",
       "strict_min_version": "109.0"
     }
   },
