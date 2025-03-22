@@ -58,11 +58,14 @@ export async function getPastedContent(div: Element): Promise<string | null> {
 export async function extractFormattedText(element: Element): Promise<string> {
   return new Promise((resolve) => {
     let formattedText = ''
+    let listLevel = 0
 
-    function extractText(node: Node) {
-      // skip the Sources button/element that appears at the end of GPT messages
+    function getIndentation(level: number): string {
+      return '  '.repeat(level)
+    }
+
+    function extractText(node: Node, isInListItem: boolean = false) {
       if (node instanceof Element) {
-        // check if this is a sources button or container
         if (
           node.querySelector('svg[aria-label="Sources"]') ||
           node.textContent?.trim() === 'Sources' ||
@@ -70,45 +73,53 @@ export async function extractFormattedText(element: Element): Promise<string> {
             (node.classList.contains('sources-container') ||
               node.classList.contains('source-item')))
         ) {
-          return // skip this node and its children
+          return
         }
       }
 
       if (node.nodeType === Node.TEXT_NODE) {
-        formattedText += node.textContent
+        const text = node.textContent?.trim()
+        if (text) formattedText += text
       } else if (node.nodeName === 'PRE') {
-        // handle code blocks
         const preElement = node as Element
         const codeElement = preElement.querySelector('code')
         const language = codeElement?.className.replace('language-', '').trim() || ''
         const codeContent = codeElement?.textContent || node.textContent || ''
-
-        formattedText += '```' + (language ? language + '\n' : '\n') + codeContent + '\n```\n\n'
+        formattedText += '```' + (language ? language + '\n' : '\n') + codeContent + '\n```\n'
       } else if (node.nodeName === 'CODE' && node.parentElement?.nodeName !== 'PRE') {
-        // handle inline code
         formattedText += '`' + node.textContent + '`'
-      } else if (node.nodeName === 'P') {
-        // handle paragraphs
+      } else if (node.nodeName === 'UL' || node.nodeName === 'OL') {
+        listLevel++
         for (let i = 0; i < node.childNodes.length; i++) {
-          extractText(node.childNodes[i])
+          extractText(node.childNodes[i], true)
         }
-        formattedText += '\n\n'
-      } else if (node.nodeName === 'OL' || node.nodeName === 'UL') {
-        // handle lists
-        formattedText += '\n'
-        for (let i = 0; i < node.childNodes.length; i++) {
-          extractText(node.childNodes[i])
-        }
-        formattedText += '\n'
+        listLevel--
+        if (listLevel === 0) formattedText += '\n'
       } else if (node.nodeName === 'LI') {
-        // handle list items
-        formattedText += '- ' + node.textContent + '\n'
+        formattedText += '\n' + getIndentation(listLevel - 1) + '- '
+        // Process all child nodes of the list item
+        for (let i = 0; i < node.childNodes.length; i++) {
+          const child = node.childNodes[i]
+          // Special handling for nested lists
+          if (child.nodeName === 'UL' || child.nodeName === 'OL') {
+            formattedText += '\n'
+            extractText(child, true)
+          } else {
+            extractText(child, true)
+          }
+        }
+      } else if (node.nodeName === 'P') {
+        if (!isInListItem) formattedText += '\n'
+        for (let i = 0; i < node.childNodes.length; i++) {
+          extractText(node.childNodes[i], isInListItem)
+        }
+        if (!isInListItem) formattedText += '\n'
       } else if (node.nodeName === 'H1') {
-        formattedText += '# ' + node.textContent + '\n\n'
+        formattedText += '\n# ' + node.textContent + '\n'
       } else if (node.nodeName === 'H2') {
-        formattedText += '## ' + node.textContent + '\n\n'
+        formattedText += '\n## ' + node.textContent + '\n'
       } else if (node.nodeName === 'H3') {
-        formattedText += '### ' + node.textContent + '\n\n'
+        formattedText += '\n### ' + node.textContent + '\n'
       } else if (node.nodeName === 'STRONG' || node.nodeName === 'B') {
         formattedText += '**' + node.textContent + '**'
       } else if (node.nodeName === 'EM' || node.nodeName === 'I') {
@@ -117,15 +128,19 @@ export async function extractFormattedText(element: Element): Promise<string> {
         const href = (node as HTMLAnchorElement).href
         formattedText += '[' + node.textContent + '](' + href + ')'
       } else {
-        // recursively process other elements
         for (let i = 0; i < node.childNodes.length; i++) {
-          extractText(node.childNodes[i])
+          extractText(node.childNodes[i], isInListItem)
         }
       }
     }
 
     extractText(element)
-    const cleanedText = formattedText.trim()
+
+    const cleanedText = formattedText
+      .replace(/\n\n\n+/g, '\n\n')
+      .replace(/^\n+/, '')
+      .replace(/\n+$/, '\n')
+      .trim()
 
     resolve(cleanedText)
   })
