@@ -18,6 +18,7 @@ export function createExportButton(): HTMLElement {
       transition-colors active:bg-bg-500/50 hover:text-text-000 hover:bg-bg-500/60 h-9 px-4 py-2 rounded-lg min-w-[5rem] 
       active:scale-[0.985] whitespace-nowrap`
     buttonContainer.className = 'mr-1'
+    buttonContainer.style.position = 'relative'
   } else {
     // original ChatGPT style
     button.className = 'btn relative btn-secondary text-token-text-primary'
@@ -29,29 +30,6 @@ export function createExportButton(): HTMLElement {
   const buttonContent = document.createElement('div')
   buttonContent.className =
     site === 'claude' ? '' : 'flex w-full items-center justify-center gap-1.5'
-
-  if (site === 'chatgpt') {
-    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-    icon.setAttribute('width', '20')
-    icon.setAttribute('height', '20')
-    icon.setAttribute('viewBox', '0 0 20 20')
-    icon.setAttribute('fill', 'none')
-    icon.classList.add('icon-sm')
-
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-    path.setAttribute('d', 'M3 17h14v-6h2v8H1v-8h2v6zm7-7V2h4l-5-5-5 5h4v8z')
-    path.setAttribute('stroke', 'currentColor')
-    path.setAttribute('stroke-width', '1.5')
-    path.setAttribute('stroke-linecap', 'round')
-    path.setAttribute('stroke-linejoin', 'round')
-
-    icon.appendChild(path)
-    buttonContent.appendChild(icon)
-  }
-
-  if (site === 'claude') {
-    buttonContainer.style.position = 'relative'
-  }
 
   buttonContent.appendChild(document.createTextNode('Export'))
   button.appendChild(buttonContent)
