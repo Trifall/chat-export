@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/chrome-manifest",
   "name": "LLM Export",
   "version": "0.0.1",
-  "description": "Export LLM conversations to markdown",
+  "description": "Export LLM conversations to Markdown, XML, JSON, and HTML",
   "manifest_version": 3,
   "minimum_chrome_version": "121",
   "browser_specific_settings": {
