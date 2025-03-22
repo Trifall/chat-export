@@ -20,16 +20,16 @@
     {
       "matches": ["https://chat.openai.com/*", "https://chatgpt.com/*", "https://claude.ai/*"],
       "js": ["content.ts"],
-      "css": ["content.css"],
+      "css": ["styles/content.css"],
       "run_at": "document_end"
     }
   ],
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "pages/popup.html",
     "default_icon": "icon.png"
   },
   "options_ui": {
-    "page": "options.html",
+    "page": "pages/options.html",
     "open_in_tab": true
   },
   "background": {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
-import '@/global.css'
 import optionsStorage, { ExportType } from '@/options-storage'
+import '@/styles/global.css'
 
 export default function OptionsPage() {
   const [exportType, setExportType] = useState<ExportType>('markdown')
