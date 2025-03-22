@@ -1,4 +1,4 @@
-# Chat Export Extension
+# Chat Export Extension (LLM)
 
 [link-cws-keys]: https://github.com/fregante/chrome-webstore-upload-keys
 [link-amo-keys]: https://addons.mozilla.org/en-US/developers/addon/api/key
@@ -6,6 +6,26 @@
 [![Test](https://github.com/Trifall/chat-export/actions/workflows/test.yml/badge.svg)](https://github.com/Trifall/chat-export/actions/workflows/test.yml)
 
 This extension allows you to export chat conversations from ChatGPT, and Claude to Markdown, XML, JSON, and HTML.
+
+The export button is placed next to the share button.
+
+I made this extension in my free time over a couple days because I wanted this feature and also [this tweet](https://x.com/tylerangert/status/1902038162836246550). Might be scuffed on edge cases but I tried my best.
+
+![Export Video Example](https://github.com/user-attachments/assets/2705e502-9e1f-41a8-88e9-3b41242d6c0f)
+
+Extension Settings:
+
+![Extension Settings](https://github.com/user-attachments/assets/7a3f11bc-66af-48c6-89ce-2619fd0c34e0)
+
+Claude Button:
+
+![Claude Export Button](https://github.com/user-attachments/assets/d2f604bb-f563-4e0c-89a1-276804be1de4)
+
+ChatGPT Button:
+
+![ChatGPT Export Button](https://github.com/user-attachments/assets/9a030781-4e8d-47a0-87b2-c15461f08ce4)
+
+
 
 ## Getting started
 
