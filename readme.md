@@ -2,6 +2,14 @@
 
 [![Test](https://github.com/Trifall/chat-export/actions/workflows/test.yml/badge.svg)](https://github.com/Trifall/chat-export/actions/workflows/test.yml)
 
+<p align="center">
+<a href="https://addons.mozilla.org/en-US/firefox/addon/chat-export/"><img src="https://user-images.githubusercontent.com/585534/107280546-7b9b2a00-6a26-11eb-8f9f-f95932f4bfec.png" alt="Get Chat Export for Firefox"></a>
+<a href="https://chromewebstore.google.com/detail/chat-export/nkdibdcomniocannnkofanbikghkpbgl"><img src="https://user-images.githubusercontent.com/585534/107280622-91a8ea80-6a26-11eb-8d07-77c548b28665.png" alt="Get Chat Export for Chromium"></a>
+</p>
+
+***
+
+
 This extension allows you to export chat conversations from ChatGPT, and Claude to Markdown, XML, JSON, and HTML.
 
 The export button is placed next to the share button.
