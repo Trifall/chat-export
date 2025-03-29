@@ -5,7 +5,7 @@
     "prebuild": "rm -rf dist",
     "build": "NODE_NO_WARNINGS=1 parcel build --config @parcel/config-webextension",
     "watch": "NODE_NO_WARNINGS=1 parcel watch --no-hmr --config @parcel/config-webextension",
-    "lint": "run-p lint:*",
+    "check": "run-p check:*",
     "check:typescript": "tsc --noEmit",
     "check:eslint": "eslint .",
     "check:prettier": "prettier --check .",
