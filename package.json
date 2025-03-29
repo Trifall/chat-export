@@ -8,7 +8,6 @@
     "lint": "run-p lint:*",
     "lint:typescript": "tsc --noEmit",
     "lint:eslint": "eslint .",
-    "lint:prettier": "prettier --check .",
     "fix": "run-p fix:*",
     "fix:eslint": "npm run lint:eslint -- --fix",
     "fix:prettier": "npm run lint:prettier -- --write",
