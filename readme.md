@@ -7,8 +7,7 @@
 <a href="https://chromewebstore.google.com/detail/chat-export/nkdibdcomniocannnkofanbikghkpbgl"><img src="https://user-images.githubusercontent.com/585534/107280622-91a8ea80-6a26-11eb-8d07-77c548b28665.png" alt="Get Chat Export for Chromium"></a>
 </p>
 
-***
-
+---
 
 This extension allows you to export chat conversations from ChatGPT, and Claude to Markdown, XML, JSON, and HTML.
 

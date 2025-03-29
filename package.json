@@ -6,12 +6,13 @@
     "build": "NODE_NO_WARNINGS=1 parcel build --config @parcel/config-webextension",
     "watch": "NODE_NO_WARNINGS=1 parcel watch --no-hmr --config @parcel/config-webextension",
     "lint": "run-p lint:*",
-    "lint:typescript": "tsc --noEmit",
-    "lint:eslint": "eslint .",
+    "check:typescript": "tsc --noEmit",
+    "check:eslint": "eslint .",
+    "check:prettier": "prettier --check .",
     "fix": "run-p fix:*",
-    "fix:eslint": "npm run lint:eslint -- --fix",
-    "fix:prettier": "npm run lint:prettier -- --write",
-    "test": "run-p lint:* build",
+    "fix:eslint": "eslint . --fix",
+    "fix:prettier": "prettier --write .",
+    "test": "run-p check:* build",
     "e2e": "playwright test"
   },
   "dependencies": {
