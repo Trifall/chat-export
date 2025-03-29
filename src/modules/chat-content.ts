@@ -38,6 +38,9 @@ export async function getChatContent(restoreClipboard: boolean = false): Promise
       // handle images first
       const images = turn.querySelectorAll('img')
       for (const image of images) {
+        // skip favicon images which are used for sources
+        if (image.src.includes('google.com/s2/favicons')) continue
+
         const imageContent = formatImageInput(image.src, image.alt, role)
         content += imageContent + '\n'
       }
@@ -45,7 +48,50 @@ export async function getChatContent(restoreClipboard: boolean = false): Promise
       // query select with class of .whitespace-pre-wrap OR .markdown
       const contentElement = turn.querySelector('.whitespace-pre-wrap, .markdown')
       if (contentElement) {
-        const extractedText = await extractFormattedText(contentElement)
+        // create a deep clone of the content element to avoid modifying the actual UI
+        const contentClone = contentElement.cloneNode(true) as Element
+
+        // delete source links by finding elements with the specific structure:
+        // span[data-state] > span > a[target="_blank"][rel="noopener"] > span.relative
+        const sourceSpans = Array.from(contentClone.querySelectorAll('span[data-state]')).filter(
+          (span) => {
+            // span has the expected structure for a source link
+            const hasExpectedStructure = !!span.querySelector(
+              'span > a[target="_blank"][rel="noopener"] > span.relative'
+            )
+            return hasExpectedStructure
+          }
+        )
+
+        // remove the source spans from their parent nodes
+        sourceSpans.forEach((span) => {
+          if (span.parentNode) {
+            span.parentNode.removeChild(span)
+          }
+        })
+
+        // remove the source containers (typically at the bottom of the message)
+        // these usually have a button with sources text and favicon images
+        const sourceContainers = Array.from(contentClone.querySelectorAll('div')).filter((div) => {
+          // find buttons with sources text
+          const hasSourcesButton = Array.from(div.querySelectorAll('button')).some((button) =>
+            button.textContent?.includes('Sources')
+          )
+          // find divs that contain favicon images
+          const hasFaviconImages = Array.from(div.querySelectorAll('img')).some((img) =>
+            img.src.includes('google.com/s2/favicons')
+          )
+
+          return hasSourcesButton || hasFaviconImages
+        })
+
+        sourceContainers.forEach((container) => {
+          if (container.parentNode) {
+            container.parentNode.removeChild(container)
+          }
+        })
+
+        const extractedText = await extractFormattedText(contentClone)
         content += extractedText
       }
 
