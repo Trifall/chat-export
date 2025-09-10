@@ -97,6 +97,120 @@ export async function getChatContent(restoreClipboard: boolean = false): Promise
 
       messages.push({ role, content })
     }
+  } else if (site === 'gemini') {
+    // aistudio.google.com (Gemini)
+    const chatTurns = document.querySelectorAll('ms-chat-turn')
+
+    for (const turn of chatTurns) {
+      // scroll this specific turn into view to ensure it's loaded
+      turn.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      })
+
+      // wait for content to load
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
+      // determine role based on the chat-turn-container class
+      const container = turn.querySelector('.chat-turn-container')
+      if (!container) {
+        continue
+      }
+
+      const role = container.classList.contains('user') ? 'user' : 'assistant'
+
+      // find the more options button
+      const optionsElement = turn.querySelector('ms-chat-turn-options')
+      if (!optionsElement) {
+        continue
+      }
+
+      const moreOptionsButton = optionsElement.querySelector(
+        'button[aria-label="Open options"]'
+      ) as HTMLButtonElement
+      if (!moreOptionsButton) {
+        continue
+      }
+
+      // click the more options button to open the overlay menu
+      moreOptionsButton.click()
+
+      // wait for overlay to appear
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      // find the overlay container (it's a sibling of body)
+      const overlayContainer = document.querySelector('.cdk-overlay-container')
+      if (!overlayContainer) {
+        // if we can't find the overlay, skip this message
+        continue
+      }
+
+      // find the "Copy as markdown" button in the overlay
+      let copyMarkdownButton: HTMLButtonElement | null = null
+
+      // try different approaches to find the copy as markdown button
+      const buttons = Array.from(overlayContainer.querySelectorAll('button'))
+      for (const btn of buttons) {
+        if (btn.textContent?.includes('Copy as markdown')) {
+          copyMarkdownButton = btn as HTMLButtonElement
+          break
+        }
+      }
+
+      // also try finding by the specific icon class mentioned in the HTML
+      if (!copyMarkdownButton) {
+        copyMarkdownButton = overlayContainer.querySelector(
+          'button .copy-markdown-button'
+        ) as HTMLButtonElement
+      }
+
+      if (!copyMarkdownButton) {
+        // close the overlay by clicking outside or pressing Escape
+        const backdrop = document.querySelector('.cdk-overlay-backdrop')
+        if (backdrop) {
+          ;(backdrop as HTMLElement).click()
+        }
+        continue
+      }
+
+      // click the copy as markdown button
+      copyMarkdownButton.click()
+
+      // wait for clipboard to be updated
+      await new Promise((resolve) => setTimeout(resolve, 200))
+
+      // get the content from clipboard
+      const content = await navigator.clipboard.readText()
+
+      // Check for thinking content in Gemini messages
+      let thinkingContent = ''
+      if (role === 'assistant') {
+        const thinkingChunk = turn.querySelector('ms-thought-chunk')
+        if (thinkingChunk) {
+          // Find the thinking panel that contains "Thoughts" text
+          const thinkingPanel = thinkingChunk.querySelector('mat-panel-title')
+          if (thinkingPanel && thinkingPanel.textContent?.includes('Thoughts')) {
+            // Extract thinking content from the expanded panel
+            const thinkingBody = thinkingChunk.querySelector('.mat-expansion-panel-body')
+            if (thinkingBody) {
+              const thinkingText = thinkingBody.textContent?.trim() || ''
+              if (thinkingText) {
+                thinkingContent = `*Thinking*\n${thinkingText}\n\n`
+              }
+            }
+          }
+        }
+      }
+
+      if (content && content.trim()) {
+        // Combine thinking content (if any) with regular content
+        const finalContent = thinkingContent + content.trim()
+        messages.push({ role, content: finalContent })
+      }
+
+      // wait a bit to avoid rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
   } else {
     // claude.ai
     const messageDivs = document.querySelectorAll('div.font-claude-message, div.font-user-message')

@@ -1,4 +1,4 @@
-export type Site = 'chatgpt' | 'claude'
+export type Site = 'chatgpt' | 'claude' | 'gemini'
 
 export interface Message {
   role: string

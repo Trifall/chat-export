@@ -31,6 +31,10 @@ ChatGPT Button:
 
 ![ChatGPT Export Button](https://github.com/user-attachments/assets/9a030781-4e8d-47a0-87b2-c15461f08ce4)
 
+Gemini AIStudio Button:
+
+<!-- ![Gemini AIStudio Export Button]() -->
+
 ## Getting started
 
 <!--
@@ -52,7 +56,7 @@ The build step will create the `dist` folder, this folder will contain the gener
 Using [web-ext](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/) is recommended for automatic reloading and running in a dedicated browser instance. Alternatively you can load the extension manually (see below).
 
 1. Run `npm run watch` to watch for file changes and build continuously
-1. Run `npm install --global web-ext` (only only for the first time)
+1. Run `npm install --global web-ext` (only for the first time)
 1. In another terminal, run `web-ext run -t chromium`
 1. Check that the extension is loaded by opening the extension options ([in Firefox](media/extension_options_firefox.png) or [in Chrome](media/extension_options_chrome.png)).
 

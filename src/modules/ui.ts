@@ -19,28 +19,58 @@ export function createExportButton(): HTMLElement {
       active:scale-[0.985] whitespace-nowrap`
     buttonContainer.className = 'mr-1'
     buttonContainer.style.position = 'relative'
+  } else if (site === 'gemini') {
+    // match Gemini's Material Design button style
+    button.className = 'ms-button-borderless ms-button-icon'
+    button.setAttribute('ms-button', '')
+    button.setAttribute('variant', 'icon-borderless')
+    button.setAttribute('aria-label', 'Export chat')
+
+    // Create icon span like other Gemini buttons
+    const iconSpan = document.createElement('span')
+    iconSpan.className =
+      'material-symbols-outlined notranslate ms-button-icon-symbol ng-star-inserted'
+    iconSpan.setAttribute('aria-hidden', 'true')
+    iconSpan.textContent = 'download'
+    button.appendChild(iconSpan)
   } else {
     // original ChatGPT style
     button.className = 'btn relative btn-secondary text-token-text-primary'
   }
 
-  button.setAttribute('aria-label', 'Export')
-  button.setAttribute('data-testid', 'export-chat-button')
+  if (site !== 'gemini') {
+    button.setAttribute('aria-label', 'Export')
+    button.setAttribute('data-testid', 'export-chat-button')
 
-  const buttonContent = document.createElement('div')
-  buttonContent.className =
-    site === 'claude' ? '' : 'flex w-full items-center justify-center gap-1.5'
+    const buttonContent = document.createElement('div')
+    buttonContent.className =
+      site === 'claude' ? '' : 'flex w-full items-center justify-center gap-1.5'
 
-  buttonContent.appendChild(document.createTextNode('Export'))
-  button.appendChild(buttonContent)
+    buttonContent.appendChild(document.createTextNode('Export'))
+    button.appendChild(buttonContent)
+  }
   buttonContainer.appendChild(button)
 
   // make dropdown
   const dropdown = document.createElement('div')
-  dropdown.className = 'absolute hidden rounded-md shadow-lg mt-3 py-2 w-48 z-50 text-zinc-100'
-  dropdown.style.top = '100%'
-  dropdown.style.left = '0'
-  dropdown.style.backgroundColor = 'rgb(24 24 27)' // zinc-900
+  if (site === 'gemini') {
+    // Match Gemini's Material Design menu style
+    dropdown.className = 'mat-mdc-menu-panel mat-menu-after mat-menu-below ng-star-inserted'
+    dropdown.style.transformOrigin = 'right top 0px'
+    dropdown.style.position = 'fixed'
+    dropdown.style.zIndex = '99999'
+    dropdown.style.display = 'none'
+    dropdown.style.backgroundColor = 'white'
+    dropdown.style.borderRadius = '4px'
+    dropdown.style.boxShadow =
+      '0 2px 4px -1px rgba(0,0,0,.2), 0 4px 5px 0 rgba(0,0,0,.14), 0 1px 10px 0 rgba(0,0,0,.12)'
+    dropdown.style.minWidth = '200px'
+  } else {
+    dropdown.className = 'absolute hidden rounded-md shadow-lg mt-3 py-2 w-48 z-50 text-zinc-100'
+    dropdown.style.top = '100%'
+    dropdown.style.left = '0'
+    dropdown.style.backgroundColor = 'rgb(24 24 27)' // zinc-900
+  }
 
   const options = [
     { text: 'Copy to Clipboard', action: copyToClipboard },
@@ -49,33 +79,76 @@ export function createExportButton(): HTMLElement {
 
   options.forEach((option, index) => {
     const item = document.createElement('button')
-    item.className = 'w-full text-left px-4 py-4 text-zinc-100'
-    item.style.backgroundColor = 'rgb(24 24 27)' // zinc-900
-    item.addEventListener('mouseenter', () => {
-      item.style.backgroundColor = 'rgb(39 39 42)' // zinc-800
-    })
-    item.addEventListener('mouseleave', () => {
+
+    if (site === 'gemini') {
+      // Match Gemini's Material Design menu item style
+      item.className = 'mat-mdc-menu-item mat-focus-indicator'
+      item.setAttribute('mat-menu-item', '')
+      item.setAttribute('role', 'menuitem')
+      item.setAttribute('tabindex', '0')
+      item.setAttribute('aria-disabled', 'false')
+
+      const itemText = document.createElement('span')
+      itemText.className = 'mat-mdc-menu-item-text'
+      itemText.textContent = option.text
+      item.appendChild(itemText)
+
+      const ripple = document.createElement('div')
+      ripple.className = 'mat-ripple mat-mdc-menu-ripple'
+      item.appendChild(ripple)
+    } else {
+      item.className = 'w-full text-left px-4 py-4 text-zinc-100'
       item.style.backgroundColor = 'rgb(24 24 27)' // zinc-900
-    })
-    item.textContent = option.text
-    item.onclick = option.action
-    if (index > 0) {
-      item.style.marginTop = '4px'
+      item.addEventListener('mouseenter', () => {
+        item.style.backgroundColor = 'rgb(39 39 42)' // zinc-800
+      })
+      item.addEventListener('mouseleave', () => {
+        item.style.backgroundColor = 'rgb(24 24 27)' // zinc-900
+      })
+      item.textContent = option.text
+      if (index > 0) {
+        item.style.marginTop = '4px'
+      }
     }
+
+    item.onclick = option.action
     dropdown.appendChild(item)
   })
 
-  buttonContainer.appendChild(dropdown)
+  if (site === 'gemini') {
+    // For Gemini, append to body to avoid stacking context issues
+    document.body.appendChild(dropdown)
+  } else {
+    buttonContainer.appendChild(dropdown)
+  }
 
   // toggle dropdown
   button.onclick = (e) => {
     e.stopPropagation()
-    dropdown.classList.toggle('hidden')
+    if (site === 'gemini') {
+      // Position dropdown relative to button for Gemini
+      const buttonRect = button.getBoundingClientRect()
+      dropdown.style.top = `${buttonRect.bottom + window.scrollY}px`
+      dropdown.style.left = `${buttonRect.right - 200 + window.scrollX}px` // 200px is dropdown width
+
+      // Toggle display for Gemini Material Design
+      if (dropdown.style.display === 'none' || dropdown.style.display === '') {
+        dropdown.style.display = 'block'
+      } else {
+        dropdown.style.display = 'none'
+      }
+    } else {
+      dropdown.classList.toggle('hidden')
+    }
   }
 
   // close dropdown when clicking outside
   document.addEventListener('click', () => {
-    dropdown.classList.add('hidden')
+    if (site === 'gemini') {
+      dropdown.style.display = 'none'
+    } else {
+      dropdown.classList.add('hidden')
+    }
   })
 
   return buttonContainer

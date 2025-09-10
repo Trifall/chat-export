@@ -67,7 +67,8 @@
     "run": {
       "startUrl": [
         "https://chatgpt.com",
-        "https://claude.ai"
+        "https://claude.ai",
+        "https://aistudio.google.com"
       ]
     }
   },

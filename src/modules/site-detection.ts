@@ -1,4 +1,4 @@
-import { CHATGPT_URLS, CLAUDE_URLS } from './constants'
+import { CHATGPT_URLS, CLAUDE_URLS, GEMINI_URLS } from './constants'
 import { Site } from './types'
 
 export function detectSite(): Site {
@@ -8,6 +8,9 @@ export function detectSite(): Site {
   }
   if (CLAUDE_URLS.some((u) => url.includes(u))) {
     return 'claude'
+  }
+  if (GEMINI_URLS.some((u) => url.includes(u))) {
+    return 'gemini'
   }
   throw new Error('Unsupported site')
 }

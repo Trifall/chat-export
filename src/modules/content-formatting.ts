@@ -1,7 +1,7 @@
 import { Message } from './types'
 
 export async function formatContent(messages: Array<Message>, format: string): Promise<string> {
-  console.log(`Messages: ${JSON.stringify(messages)}`)
+  // console.log(`Messages: ${JSON.stringify(messages)}`)
 
   switch (format) {
     case 'markdown':

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/chrome-manifest",
   "name": "Chat Export",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Export LLM chat conversations to Markdown, XML, JSON, and HTML",
   "manifest_version": 3,
   "minimum_chrome_version": "121",
@@ -18,7 +18,12 @@
   "host_permissions": ["https://chat.openai.com/*"],
   "content_scripts": [
     {
-      "matches": ["https://chat.openai.com/*", "https://chatgpt.com/*", "https://claude.ai/*"],
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://aistudio.google.com/*"
+      ],
       "js": ["content.ts"],
       "css": ["styles/content.css"],
       "run_at": "document_end"
