@@ -37,7 +37,6 @@ Gemini AIStudio Button:
 
 ## Getting started
 
-
 <!--
 ### Install from Browser Store
 
