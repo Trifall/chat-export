@@ -33,9 +33,10 @@ ChatGPT Button:
 
 Gemini AIStudio Button:
 
-<!-- ![Gemini AIStudio Export Button]() -->
+![Gemini AIStudio Export Button](https://github.com/user-attachments/assets/404c1304-12ea-4e7a-bcf8-f4ec91faf817)
 
 ## Getting started
+
 
 <!--
 ### Install from Browser Store
