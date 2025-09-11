@@ -1,24 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 
-import optionsStorage, { ExportType } from '@/options-storage'
-import '@/styles/global.css'
+import optionsStorage, { ExportType } from '@/options-storage';
+import '@/styles/global.css';
 
 export default function OptionsPage() {
-  const [exportType, setExportType] = useState<ExportType>('markdown')
+  const [exportType, setExportType] = useState<ExportType>('markdown');
 
   useEffect(() => {
     optionsStorage.getAll().then((options) => {
       if (options.exportType) {
-        setExportType(options.exportType as ExportType)
+        setExportType(options.exportType as ExportType);
       }
-    })
-  }, [])
+    });
+  }, []);
 
   const handleExportTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value as ExportType
-    setExportType(value)
-    optionsStorage.set({ exportType: value })
-  }
+    const value = e.target.value as ExportType;
+    setExportType(value);
+    optionsStorage.set({ exportType: value });
+  };
 
   return (
     <div id="root" className="min-h-screen !bg-zinc-950 text-zinc-100">
@@ -48,5 +48,5 @@ export default function OptionsPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,10 +1,10 @@
-import pluginJs from '@eslint/js'
+import pluginJs from '@eslint/js';
 
-import eslintConfigPrettier from 'eslint-config-prettier'
-import reactPlugin from 'eslint-plugin-react'
-import tailwind from 'eslint-plugin-tailwindcss'
-import globals from 'globals'
-import tseslint from 'typescript-eslint'
+import eslintConfigPrettier from 'eslint-config-prettier';
+import reactPlugin from 'eslint-plugin-react';
+import tailwind from 'eslint-plugin-tailwindcss';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
@@ -39,4 +39,4 @@ export default [
   {
     ignores: ['dist'],
   },
-]
+];
