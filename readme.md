@@ -9,7 +9,7 @@
 
 ---
 
-This extension allows you to export chat conversations from ChatGPT, and Claude to Markdown, XML, JSON, and HTML.
+This extension allows you to export chat conversations from ChatGPT, Gemini (AI Studio), and Claude to Markdown, XML, JSON, and HTML.
 
 The export button is placed next to the share button.
 
