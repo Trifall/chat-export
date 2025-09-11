@@ -1,12 +1,17 @@
 import { getChatContent } from '@/modules/chat-content'
 
 export async function copyToClipboard() {
-  const { content } = await getChatContent(false)
+  const { content, messageCount, failedMessages } = await getChatContent(false)
   await navigator.clipboard.writeText(content)
+
+  const failedText = failedMessages > 0 ? `\n⚠️ Failed messages: ${failedMessages}` : ''
+  alert(
+    `✅ Chat copied to clipboard successfully!\n\nStats:\n📝 Total messages: ${messageCount}\n📏 Total length: ${content.length.toLocaleString()} characters${failedText}`
+  )
 }
 
 export async function saveToFile() {
-  const { format, content } = await getChatContent(true)
+  const { format, content, messageCount, failedMessages } = await getChatContent(true)
   const mimeTypes: { [key: string]: string } = {
     markdown: 'text/markdown',
     json: 'application/json',
@@ -30,4 +35,9 @@ export async function saveToFile() {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+
+  const failedText = failedMessages > 0 ? `\n⚠️ Failed messages: ${failedMessages}` : ''
+  alert(
+    `💾 Chat saved to file successfully!\n\nStats:\n📝 Total messages: ${messageCount}\n📏 Total length: ${content.length.toLocaleString()} characters\n📄 Format: ${format.toUpperCase()}\n📁 Filename: ${a.download}${failedText}`
+  )
 }

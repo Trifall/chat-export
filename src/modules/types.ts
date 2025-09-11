@@ -8,4 +8,6 @@ export interface Message {
 export interface ChatContent {
   format: string
   content: string
+  messageCount: number
+  failedMessages: number
 }

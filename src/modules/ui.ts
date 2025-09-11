@@ -13,7 +13,7 @@ export function createExportButton(): HTMLElement {
     // match Claude's button style
     button.className = `inline-flex items-center justify-center relative shrink-0 ring-offset-2 ring-offset-bg-300 
       ring-accent-main-100 focus-visible:outline-none focus-visible:ring-1 disabled:pointer-events-none 
-      disabled:opacity-50 disabled:shadow-none disabled:drop-shadow-none bg-[radial-gradient(ellipse,_var(--tw-gradient-stops))] 
+      disabled:opFacity-50 disabled:shadow-none disabled:drop-shadow-none bg-[radial-gradient(ellipse,_var(--tw-gradient-stops))] 
       from-bg-500/10 from-50% to-bg-500/30 border-0.5 border-border-400 font-medium font-styrene text-text-100/90 
       transition-colors active:bg-bg-500/50 hover:text-text-000 hover:bg-bg-500/60 h-9 px-4 py-2 rounded-lg min-w-[5rem] 
       active:scale-[0.985] whitespace-nowrap`
@@ -60,7 +60,11 @@ export function createExportButton(): HTMLElement {
     dropdown.style.position = 'fixed'
     dropdown.style.zIndex = '99999'
     dropdown.style.display = 'none'
-    dropdown.style.backgroundColor = 'white'
+    // Use CSS custom property for theme-aware background, fallback to appropriate colors
+    dropdown.style.backgroundColor =
+      'var(--mat-menu-container-color, var(--gm-colorfamily-white, #f9f9f9))'
+    dropdown.style.color =
+      'var(--mat-menu-item-label-text-color, var(--gm-colorfamily-grey900, #1a1a1a))'
     dropdown.style.borderRadius = '4px'
     dropdown.style.boxShadow =
       '0 2px 4px -1px rgba(0,0,0,.2), 0 4px 5px 0 rgba(0,0,0,.14), 0 1px 10px 0 rgba(0,0,0,.12)'
@@ -81,7 +85,7 @@ export function createExportButton(): HTMLElement {
     const item = document.createElement('button')
 
     if (site === 'gemini') {
-      // Match Gemini's Material Design menu item style
+      // match Gemini's Material Design menu item style
       item.className = 'mat-mdc-menu-item mat-focus-indicator'
       item.setAttribute('mat-menu-item', '')
       item.setAttribute('role', 'menuitem')
@@ -116,7 +120,7 @@ export function createExportButton(): HTMLElement {
   })
 
   if (site === 'gemini') {
-    // For Gemini, append to body to avoid stacking context issues
+    // append to body to avoid stacking context issues
     document.body.appendChild(dropdown)
   } else {
     buttonContainer.appendChild(dropdown)
@@ -126,12 +130,12 @@ export function createExportButton(): HTMLElement {
   button.onclick = (e) => {
     e.stopPropagation()
     if (site === 'gemini') {
-      // Position dropdown relative to button for Gemini
+      // position dropdown relative to button for Gemini
       const buttonRect = button.getBoundingClientRect()
       dropdown.style.top = `${buttonRect.bottom + window.scrollY}px`
       dropdown.style.left = `${buttonRect.right - 200 + window.scrollX}px` // 200px is dropdown width
 
-      // Toggle display for Gemini Material Design
+      // toggle display for Gemini Material Design
       if (dropdown.style.display === 'none' || dropdown.style.display === '') {
         dropdown.style.display = 'block'
       } else {
