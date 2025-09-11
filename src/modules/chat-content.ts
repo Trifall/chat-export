@@ -180,32 +180,17 @@ export async function getChatContent(restoreClipboard: boolean = false): Promise
       await new Promise((resolve) => setTimeout(resolve, 200))
 
       // get the content from clipboard
-      const content = await navigator.clipboard.readText()
+      let content = await navigator.clipboard.readText()
 
-      // Check for thinking content in Gemini messages
-      let thinkingContent = ''
-      if (role === 'assistant') {
+      // Check if this is a thinking message and add prefix
+      if (role === 'assistant' && content && content.trim()) {
         const thinkingChunk = turn.querySelector('ms-thought-chunk')
         if (thinkingChunk) {
-          // Find the thinking panel that contains "Thoughts" text
-          const thinkingPanel = thinkingChunk.querySelector('mat-panel-title')
-          if (thinkingPanel && thinkingPanel.textContent?.includes('Thoughts')) {
-            // Extract thinking content from the expanded panel
-            const thinkingBody = thinkingChunk.querySelector('.mat-expansion-panel-body')
-            if (thinkingBody) {
-              const thinkingText = thinkingBody.textContent?.trim() || ''
-              if (thinkingText) {
-                thinkingContent = `*Thinking*\n${thinkingText}\n\n`
-              }
-            }
-          }
+          content = `*Thinking Output*\n\n${content.trim()}`
         }
-      }
-
-      if (content && content.trim()) {
-        // Combine thinking content (if any) with regular content
-        const finalContent = thinkingContent + content.trim()
-        messages.push({ role, content: finalContent })
+        messages.push({ role, content })
+      } else if (content && content.trim()) {
+        messages.push({ role, content: content.trim() })
       }
 
       // wait a bit to avoid rate limiting
