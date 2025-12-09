@@ -11,6 +11,7 @@ function init() {
   // track if we've already added the button to prevent infinite loops
   let buttonAdded = false;
   let observer: MutationObserver | null = null;
+  let currentUrl = window.location.href;
 
   // throttle function to prevent excessive DOM queries
   let throttleTimeout: number | null = null;
@@ -20,20 +21,25 @@ function init() {
     throttleTimeout = window.setTimeout(() => {
       throttleTimeout = null;
 
+      // check if button still exists in DOM (might have been removed by SPA navigation)
+      const existingButton = document.querySelector('[data-testid="export-chat-button"]');
+      if (buttonAdded && !existingButton) {
+        // button was removed (likely due to navigation), reset flag
+        buttonAdded = false;
+      }
+
       if (buttonAdded) {
-        observer?.disconnect();
         return;
       }
 
       if (site === 'claude') {
-        // for Claude.ai, look for the share button container
-        const shareButtonContainer = document.querySelector('button[data-testid="share-button"]')
-          ?.parentElement?.parentElement;
-        if (shareButtonContainer && !document.querySelector('[data-testid="export-chat-button"]')) {
+        // for Claude.ai, look for the chat-actions container which holds the Share button
+        const chatActionsContainer = document.querySelector('[data-testid="chat-actions"]');
+        if (chatActionsContainer && !document.querySelector('[data-testid="export-chat-button"]')) {
           const exportButton = createExportButton();
-          shareButtonContainer.parentElement?.appendChild(exportButton);
+          // insert export button before the Share button in the actions container
+          chatActionsContainer.insertBefore(exportButton, chatActionsContainer.firstChild);
           buttonAdded = true;
-          observer?.disconnect();
         }
       } else if (site === 'gemini') {
         const toolbarRight = document.querySelector('ms-toolbar .toolbar-right');
@@ -47,7 +53,6 @@ function init() {
             toolbarRight.appendChild(exportButton);
           }
           buttonAdded = true;
-          observer?.disconnect();
         }
       } else {
         // for ChatGPT, look for the share button
@@ -56,50 +61,88 @@ function init() {
           const exportButton = createExportButton();
           shareButton.parentElement?.insertBefore(exportButton, shareButton);
           buttonAdded = true;
-          observer?.disconnect();
         }
       }
     }, 500); // 500ms throttle
+  };
+
+  const startObserving = () => {
+    // disconnect existing observer if any
+    observer?.disconnect();
+
+    observer = new MutationObserver((mutations) => {
+      // check for URL changes (SPA navigation)
+      if (window.location.href !== currentUrl) {
+        currentUrl = window.location.href;
+        buttonAdded = false; // reset flag on navigation
+      }
+
+      // only check if we see significant DOM changes (not just text changes)
+      const hasSignificantChanges = mutations.some(
+        (mutation) =>
+          mutation.addedNodes.length > 0 &&
+          Array.from(mutation.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE)
+      );
+
+      if (hasSignificantChanges || !buttonAdded) {
+        throttledButtonCheck();
+      }
+    });
+
+    // observe more selectively - target likely parent containers instead of entire body
+    const targetElement =
+      site === 'gemini'
+        ? document.querySelector('ms-app, main, [role="main"]') || document.body
+        : document.body;
+
+    observer.observe(targetElement, {
+      childList: true,
+      subtree: true,
+    });
+  };
+
+  // listen for popstate events (browser back/forward navigation)
+  window.addEventListener('popstate', () => {
+    if (window.location.href !== currentUrl) {
+      currentUrl = window.location.href;
+      buttonAdded = false;
+      throttledButtonCheck();
+    }
+  });
+
+  // for SPAs that use pushState/replaceState, we need to intercept those calls
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+
+  history.pushState = function (...args) {
+    originalPushState.apply(this, args);
+    if (window.location.href !== currentUrl) {
+      currentUrl = window.location.href;
+      buttonAdded = false;
+      // delay check to allow DOM to update
+      setTimeout(throttledButtonCheck, 500);
+    }
+  };
+
+  history.replaceState = function (...args) {
+    originalReplaceState.apply(this, args);
+    if (window.location.href !== currentUrl) {
+      currentUrl = window.location.href;
+      buttonAdded = false;
+      // delay check to allow DOM to update
+      setTimeout(throttledButtonCheck, 500);
+    }
   };
 
   // for Gemini, wait a bit before starting to observe since the Angular app needs time to load
   const startDelay = site === 'gemini' ? 2000 : 0;
 
   setTimeout(() => {
-    // Try immediate button insertion first
+    // try immediate button insertion first
     throttledButtonCheck();
 
-    // Only set up observer if button wasn't added immediately
-    if (!buttonAdded) {
-      observer = new MutationObserver((mutations) => {
-        // Only check if we see significant DOM changes (not just text changes)
-        const hasSignificantChanges = mutations.some(
-          (mutation) =>
-            mutation.addedNodes.length > 0 &&
-            Array.from(mutation.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE)
-        );
-
-        if (hasSignificantChanges) {
-          throttledButtonCheck();
-        }
-      });
-
-      // Observe more selectively - target likely parent containers instead of entire body
-      const targetElement =
-        site === 'gemini'
-          ? document.querySelector('ms-app, main, [role="main"]') || document.body
-          : document.body;
-
-      observer.observe(targetElement, {
-        childList: true,
-        subtree: true,
-      });
-
-      // Stop observing after 30 seconds to prevent indefinite monitoring
-      setTimeout(() => {
-        observer?.disconnect();
-      }, 30000);
-    }
+    // start observing - dont stop after 30 seconds for SPAs
+    startObserving();
   }, startDelay);
 }
 

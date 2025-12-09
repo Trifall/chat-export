@@ -25,6 +25,7 @@ export function createExportButton(): HTMLElement {
     button.setAttribute('ms-button', '');
     button.setAttribute('variant', 'icon-borderless');
     button.setAttribute('aria-label', 'Export chat');
+    button.setAttribute('data-testid', 'export-chat-button');
 
     // Create icon span like other Gemini buttons
     const iconSpan = document.createElement('span');
