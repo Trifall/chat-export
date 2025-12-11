@@ -35,13 +35,11 @@ Gemini AIStudio Button:
 
 ![Gemini AIStudio Export Button](https://github.com/user-attachments/assets/404c1304-12ea-4e7a-bcf8-f4ec91faf817)
 
+## Contributing
+
+- If you manage to fix a bug or add a useful feature, pull requests are welcome.
+
 ## Getting started
-
-<!--
-### Install from Browser Store
-
-- Firefox: [https://addons.mozilla.org/en-US/firefox/addon/chat-export/](https://addons.mozilla.org/en-US/firefox/addon/chat-export/)
-- Chrome: [https://chrome.google.com/webstore/detail/chat-export](https://chrome.google.com/webstore/detail/chat-export) -->
 
 ### 🛠 Build locally
 
