@@ -1,4 +1,4 @@
-import { extractFormattedText } from '@/modules/content-extraction';
+import { extractFormattedText } from '@/modules/content-handlers';
 import { Message } from '@/modules/types';
 
 export async function closeExistingOverlays() {

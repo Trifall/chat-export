@@ -55,13 +55,12 @@ export function createExportButton(): HTMLElement {
   // make dropdown
   const dropdown = document.createElement('div');
   if (site === 'gemini') {
-    // Match Gemini's Material Design menu style
+    // match Geminis Material Design menu style
     dropdown.className = 'mat-mdc-menu-panel mat-menu-after mat-menu-below ng-star-inserted';
     dropdown.style.transformOrigin = 'right top 0px';
     dropdown.style.position = 'fixed';
     dropdown.style.zIndex = '99999';
     dropdown.style.display = 'none';
-    // Use CSS custom property for theme-aware background, fallback to appropriate colors
     dropdown.style.backgroundColor =
       'var(--mat-menu-container-color, var(--gm-colorfamily-white, #f9f9f9))';
     dropdown.style.color =
@@ -74,7 +73,7 @@ export function createExportButton(): HTMLElement {
     dropdown.className = 'absolute hidden rounded-md shadow-lg mt-3 py-2 w-48 z-50 text-zinc-100';
     dropdown.style.top = '100%';
     dropdown.style.left = '0';
-    dropdown.style.backgroundColor = 'rgb(24 24 27)'; // zinc-900
+    dropdown.style.backgroundColor = 'rgb(24 24 27)'; // zinc-900 approx
   }
 
   const options = [

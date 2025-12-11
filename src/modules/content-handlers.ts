@@ -1,5 +1,96 @@
 import { Message } from './types';
 
+export async function extractFormattedText(element: Element): Promise<string> {
+  return new Promise((resolve) => {
+    let formattedText = '';
+    let listLevel = 0;
+
+    function getIndentation(level: number): string {
+      return '  '.repeat(level);
+    }
+
+    function extractText(node: Node, isInListItem: boolean = false) {
+      if (node instanceof Element) {
+        if (
+          node.querySelector('svg[aria-label="Sources"]') ||
+          node.textContent?.trim() === 'Sources' ||
+          (node.classList &&
+            (node.classList.contains('sources-container') ||
+              node.classList.contains('source-item')))
+        ) {
+          return;
+        }
+      }
+
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.trim();
+        if (text) formattedText += text;
+      } else if (node.nodeName === 'PRE') {
+        const preElement = node as Element;
+        const codeElement = preElement.querySelector('code');
+        const language = codeElement?.className.replace('language-', '').trim() || '';
+        const codeContent = codeElement?.textContent || node.textContent || '';
+        formattedText += '```' + (language ? language + '\n' : '\n') + codeContent + '\n```\n';
+      } else if (node.nodeName === 'CODE' && node.parentElement?.nodeName !== 'PRE') {
+        formattedText += '`' + node.textContent + '`';
+      } else if (node.nodeName === 'UL' || node.nodeName === 'OL') {
+        listLevel++;
+        for (let i = 0; i < node.childNodes.length; i++) {
+          extractText(node.childNodes[i], true);
+        }
+        listLevel--;
+        if (listLevel === 0) formattedText += '\n';
+      } else if (node.nodeName === 'LI') {
+        formattedText += '\n' + getIndentation(listLevel - 1) + '- ';
+        // Process all child nodes of the list item
+        for (let i = 0; i < node.childNodes.length; i++) {
+          const child = node.childNodes[i];
+          // Special handling for nested lists
+          if (child.nodeName === 'UL' || child.nodeName === 'OL') {
+            formattedText += '\n';
+            extractText(child, true);
+          } else {
+            extractText(child, true);
+          }
+        }
+      } else if (node.nodeName === 'P') {
+        if (!isInListItem) formattedText += '\n';
+        for (let i = 0; i < node.childNodes.length; i++) {
+          extractText(node.childNodes[i], isInListItem);
+        }
+        if (!isInListItem) formattedText += '\n';
+      } else if (node.nodeName === 'H1') {
+        formattedText += '\n# ' + node.textContent + '\n';
+      } else if (node.nodeName === 'H2') {
+        formattedText += '\n## ' + node.textContent + '\n';
+      } else if (node.nodeName === 'H3') {
+        formattedText += '\n### ' + node.textContent + '\n';
+      } else if (node.nodeName === 'STRONG' || node.nodeName === 'B') {
+        formattedText += '**' + node.textContent + '**';
+      } else if (node.nodeName === 'EM' || node.nodeName === 'I') {
+        formattedText += '*' + node.textContent + '*';
+      } else if (node.nodeName === 'A') {
+        const href = (node as HTMLAnchorElement).href;
+        formattedText += '[' + node.textContent + '](' + href + ')';
+      } else {
+        for (let i = 0; i < node.childNodes.length; i++) {
+          extractText(node.childNodes[i], isInListItem);
+        }
+      }
+    }
+
+    extractText(element);
+
+    const cleanedText = formattedText
+      .replace(/\n\n\n+/g, '\n\n')
+      .replace(/^\n+/, '')
+      .replace(/\n+$/, '\n')
+      .trim();
+
+    resolve(cleanedText);
+  });
+}
+
 export async function formatContent(messages: Array<Message>, format: string): Promise<string> {
   switch (format) {
     case 'markdown':
