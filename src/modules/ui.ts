@@ -70,10 +70,11 @@ export function createExportButton(): HTMLElement {
       '0 2px 4px -1px rgba(0,0,0,.2), 0 4px 5px 0 rgba(0,0,0,.14), 0 1px 10px 0 rgba(0,0,0,.12)';
     dropdown.style.minWidth = '200px';
   } else {
-    dropdown.className = 'absolute hidden rounded-md shadow-lg mt-3 py-2 w-48 z-50 text-zinc-100';
-    dropdown.style.top = '100%';
-    dropdown.style.left = '0';
+    dropdown.className = 'absolute rounded-md shadow-lg py-2 w-48 z-50 text-zinc-100';
+    dropdown.style.position = 'fixed'; // Use fixed positioning to avoid overflow issues
+    dropdown.style.zIndex = '99999';
     dropdown.style.backgroundColor = 'rgb(24 24 27)'; // zinc-900 approx
+    dropdown.style.display = 'none'; // Use display instead of hidden class
   }
 
   const options = [
@@ -119,30 +120,29 @@ export function createExportButton(): HTMLElement {
     dropdown.appendChild(item);
   });
 
-  if (site === 'gemini') {
-    // append to body to avoid stacking context issues
-    document.body.appendChild(dropdown);
-  } else {
-    buttonContainer.appendChild(dropdown);
-  }
+  // Always append to body to avoid stacking context and overflow issues
+  document.body.appendChild(dropdown);
 
   // toggle dropdown
   button.onclick = (e) => {
     e.stopPropagation();
-    if (site === 'gemini') {
-      // position dropdown relative to button for Gemini
-      const buttonRect = button.getBoundingClientRect();
-      dropdown.style.top = `${buttonRect.bottom + window.scrollY}px`;
-      dropdown.style.left = `${buttonRect.right - 200 + window.scrollX}px`; // 200px is dropdown width
 
-      // toggle display for Gemini Material Design
-      if (dropdown.style.display === 'none' || dropdown.style.display === '') {
-        dropdown.style.display = 'block';
-      } else {
-        dropdown.style.display = 'none';
-      }
+    // position dropdown relative to button for all sites
+    const buttonRect = button.getBoundingClientRect();
+    dropdown.style.top = `${buttonRect.bottom + window.scrollY}px`;
+
+    if (site === 'gemini') {
+      dropdown.style.left = `${buttonRect.right - 200 + window.scrollX}px`; // 200px is dropdown width
     } else {
-      dropdown.classList.toggle('hidden');
+      // For ChatGPT and Claude, align left edge with button
+      dropdown.style.left = `${buttonRect.left + window.scrollX}px`;
+    }
+
+    // toggle display
+    if (dropdown.style.display === 'none' || dropdown.style.display === '') {
+      dropdown.style.display = 'block';
+    } else {
+      dropdown.style.display = 'none';
     }
   };
 
@@ -151,7 +151,7 @@ export function createExportButton(): HTMLElement {
     if (site === 'gemini') {
       dropdown.style.display = 'none';
     } else {
-      dropdown.classList.add('hidden');
+      dropdown.style.display = 'none';
     }
   });
 
