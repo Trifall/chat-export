@@ -1,9 +1,30 @@
 import browser from 'webextension-polyfill';
 
+import { getChatContent } from '@/modules/chat-content';
 import { detectSite } from '@/modules/site-detection';
 import { createExportButton } from '@/modules/ui';
 
 console.log(' Content script loaded for', browser.runtime.getManifest().name);
+
+// listen for messages from popup
+browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (
+    message &&
+    typeof message === 'object' &&
+    'type' in message &&
+    message.type === 'GET_CHAT_CONTENT'
+  ) {
+    getChatContent(false)
+      .then((result) => {
+        sendResponse({ success: true, data: result });
+      })
+      .catch((error: Error) => {
+        sendResponse({ success: false, error: error.message });
+      });
+  }
+  // return true for handled messages to keep the message channel open for async response
+  return true;
+});
 
 function init() {
   const site = detectSite();
