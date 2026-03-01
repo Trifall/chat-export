@@ -33,8 +33,10 @@ function init() {
       }
 
       if (site === 'claude') {
-        // for Claude.ai, look for the chat-actions container which holds the Share button
-        const chatActionsContainer = document.querySelector('[data-testid="chat-actions"]');
+        // for Claude.ai, look for the wiggle-controls-actions container which holds the Share button
+        const chatActionsContainer = document.querySelector(
+          '[data-testid="wiggle-controls-actions"]'
+        );
         if (chatActionsContainer && !document.querySelector('[data-testid="export-chat-button"]')) {
           const exportButton = createExportButton();
           // insert export button before the Share button in the actions container
