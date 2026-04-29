@@ -12,7 +12,7 @@ export async function getChatContent(restoreClipboard: boolean = false): Promise
   const site = detectSite();
   const messages: Array<Message> = [];
   let failedMessages = 0;
-  const originalClipboard = await navigator.clipboard.readText();
+  const originalClipboard = restoreClipboard ? await navigator.clipboard.readText() : null;
 
   if (site === 'chatgpt') {
     const { chatgptMessages, failedChatgptMessages } = await getChatGPTChatContent();
@@ -33,7 +33,7 @@ export async function getChatContent(restoreClipboard: boolean = false): Promise
   const format = options.exportType || 'markdown';
 
   // restore original clipboard content
-  if (restoreClipboard) {
+  if (originalClipboard !== null) {
     await navigator.clipboard.writeText(originalClipboard);
   }
 
