@@ -5,10 +5,6 @@ export async function extractFormattedText(element: Element): Promise<string> {
     let formattedText = '';
     let listLevel = 0;
 
-    function getIndentation(level: number): string {
-      return '  '.repeat(level);
-    }
-
     function extractText(node: Node, isInListItem: boolean = false) {
       if (node instanceof Element) {
         if (
@@ -29,7 +25,7 @@ export async function extractFormattedText(element: Element): Promise<string> {
         const preElement = node as Element;
         const codeElement = preElement.querySelector('code');
         const language = codeElement?.className.replace('language-', '').trim() || '';
-        const codeContent = codeElement?.textContent || node.textContent || '';
+        const codeContent = getCodeBlockContent(preElement);
         formattedText += '```' + (language ? language + '\n' : '\n') + codeContent + '\n```\n';
       } else if (node.nodeName === 'CODE' && node.parentElement?.nodeName !== 'PRE') {
         formattedText += '`' + node.textContent + '`';
@@ -77,6 +73,50 @@ export async function extractFormattedText(element: Element): Promise<string> {
           extractText(node.childNodes[i], isInListItem);
         }
       }
+    }
+
+    function getIndentation(level: number): string {
+      return '  '.repeat(level);
+    }
+
+    function getCodeBlockContent(preElement: Element): string {
+      const codeElement = preElement.querySelector('code');
+      const codeSource = codeElement || preElement;
+
+      // The outer ChatGPT `<pre>` contains toolbar/chrome. The real code lives
+      // in an editor-rendered shape like:
+      //
+      //   <div class="... cm-editor ...">
+      //     <div class="cm-scroller">
+      //       <pre class="cm-content ...">
+      //         <code>
+      //           <span># comment</span><br>
+      //           <span>command</span><br><br>
+      //           <span># next comment</span><br>
+      //           <span>next-command</span>
+      //         </code>
+      //       </pre>
+      //     </div>
+      //   </div>
+      //
+      // The inner `<code>` uses `<br>` elements for line breaks. `textContent`
+      // drops those breaks, and `innerText` is not reliable after cloning the
+      // DOM, so preserve `<br>` explicitly while reading the code subtree.
+      return getTextWithLineBreaks(codeSource).replace(/\r\n?/g, '\n').replace(/\n+$/, '');
+    }
+
+    function getTextWithLineBreaks(node: Node): string {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent || '';
+      }
+
+      if (node.nodeName === 'BR') {
+        return '\n';
+      }
+
+      return Array.from(node.childNodes)
+        .map((childNode) => getTextWithLineBreaks(childNode))
+        .join('');
     }
 
     extractText(element);
