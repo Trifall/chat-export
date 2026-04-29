@@ -45,20 +45,25 @@ async function extractChatGPTMessageContent(
     }
   });
 
-  // remove the source containers (typically at the bottom of the message)
-  // these usually have a button with sources text and favicon images
-  const sourceContainers = Array.from(contentClone.querySelectorAll('div')).filter((div) => {
-    // find buttons with sources text
-    const hasSourcesButton = Array.from(div.querySelectorAll('button')).some((button) =>
-      button.textContent?.includes('Sources')
-    );
-    // find divs that contain favicon images
-    const hasFaviconImages = Array.from(div.querySelectorAll('img')).some((img) =>
-      img.src.includes('google.com/s2/favicons')
-    );
+  const sourceContainers = new Set<Element>();
 
-    return hasSourcesButton || hasFaviconImages;
-  });
+  for (const button of contentClone.querySelectorAll('button')) {
+    if (button.textContent?.includes('Sources')) {
+      const sourceContainer = button.closest('div');
+      if (sourceContainer) {
+        sourceContainers.add(sourceContainer);
+      }
+    }
+  }
+
+  for (const image of contentClone.querySelectorAll('img')) {
+    if (image.src.includes('google.com/s2/favicons')) {
+      const sourceContainer = image.closest('div');
+      if (sourceContainer) {
+        sourceContainers.add(sourceContainer);
+      }
+    }
+  }
 
   sourceContainers.forEach((container) => {
     if (container.parentNode) {
@@ -109,12 +114,12 @@ export const getChatGPTChatContent = async () => {
     // scroll this specific turn into view to ensure it's loaded
     const block = role === 'assistant' ? 'end' : 'start';
     turn.scrollIntoView({
-      behavior: 'smooth',
+      behavior: 'instant',
       block,
     });
 
     // wait for content to load
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 250));
 
     try {
       const turnParts = Array.from(turn.querySelectorAll('[data-message-author-role], button'));
