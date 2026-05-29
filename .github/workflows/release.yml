@@ -25,7 +25,7 @@ jobs:
       - name: Test and build
         run: npm test
       - name: Create tag if necessary
-        uses: fregante/daily-version-action@v2
+        uses: fregante/daily-version-action@v3
       - name: Update manifest.json with version ${{ env.DAILY_VERSION}}
         if: env.DAILY_VERSION_CREATED
         run: npx dot-json@1 "$DIRECTORY/manifest.json" version "$DAILY_VERSION"
@@ -50,7 +50,7 @@ jobs:
     environment: Chrome
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
       - run: npx chrome-webstore-upload-cli@3 upload --auto-publish
         working-directory: artifact
         env:
@@ -65,7 +65,7 @@ jobs:
     environment: Firefox
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
       - run: npx web-ext@7 sign --use-submission-api --channel listed
         working-directory: artifact
         env:
