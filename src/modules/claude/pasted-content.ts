@@ -155,31 +155,80 @@ export async function extractAllClaudePastedContent(messageContainer: Element): 
   }
 }
 
-export async function getClaudePastedContent(div: Element): Promise<string | null> {
+export async function getClaudeNonPastedContent(div: Element): Promise<string | null> {
   // find all file and image elements
-  const fileElements = div.querySelectorAll(
+  const allFileElements = div.querySelectorAll(
     'div[data-testid="file-thumbnail"]'
   ) as NodeListOf<HTMLElement>;
   const imageElements = div.querySelectorAll('img') as NodeListOf<HTMLImageElement>;
+
+  // filter out file thumbnails that have a "pasted" badge (those are handled by extractAllClaudePastedContent)
+  const fileElements: HTMLElement[] = [];
+  allFileElements.forEach((thumbnail) => {
+    const badgeElement = thumbnail.querySelector('.text-text-300');
+    if (!badgeElement || !badgeElement.textContent?.toLowerCase().includes('pasted')) {
+      fileElements.push(thumbnail);
+    }
+  });
+
   if (!fileElements.length && !imageElements.length) return null;
 
   const contents: string[] = [];
 
-  // handle files
+  // handle non-pasted files
   for (let i = 0; i < fileElements.length; i++) {
-    // click to open side panel
     const clickableDiv = fileElements[i];
-    if (clickableDiv) clickableDiv.click();
-    await new Promise((resolve) => setTimeout(resolve, 125)); // wait for panel to open
 
-    // find the content in the side panel
+    // extract filename from the thumbnail before clicking
+    const fileNameEl = clickableDiv.querySelector('h3');
+    const fileName = fileNameEl?.textContent?.trim() || 'unknown file';
+
+    // close any stale side panel left from previous extractions
+    // (prevents querySelector from finding hidden/stale content elements)
+    const staleCloseButton = document.querySelector(
+      'button[data-testid="close-file-preview"]'
+    ) as HTMLElement;
+    if (staleCloseButton) {
+      staleCloseButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    // click the button inside the thumbnail directly (more reliable than clicking the wrapper div)
+    const buttonInThumbnail = clickableDiv.querySelector('button') as HTMLElement;
+    (buttonInThumbnail || clickableDiv).click();
+    await new Promise((resolve) => setTimeout(resolve, 750));
+
+    // check if a "Preview isn't available" dialog appeared (non-previewable file)
+    const previewDialog = document.querySelector('div[role="dialog"][data-state="open"]');
+    if (previewDialog) {
+      const dialogText = previewDialog.textContent || '';
+      if (dialogText.includes("Preview isn't available")) {
+        // non-previewable file — close the dialog and add a placeholder
+        const closeBtn = previewDialog.querySelector('button[aria-label="Close"]') as HTMLElement;
+        if (closeBtn) {
+          closeBtn.click();
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+        contents.push(`User attached file: ${fileName} (preview not available)\n`);
+        continue;
+      }
+    }
+
+    // check if the side panel actually opened by looking for its close button
+    const sidePanelCloseButton = document.querySelector(
+      'button[data-testid="close-file-preview"]'
+    ) as HTMLElement;
+    if (!sidePanelCloseButton) {
+      // side panel didn't open — this file is non-previewable (no dialog appeared either)
+      contents.push(`User attached file: ${fileName} (preview not available)\n`);
+      continue;
+    }
+
+    // previewable file — find the content in the side panel
     const contentElement = document.querySelector('.whitespace-pre-wrap.break-all.text-xs');
     if (!contentElement) {
       // close the panel if we couldn't find the content
-      const closeButton = document.querySelector(
-        'button[data-testid="close-file-preview"]'
-      ) as HTMLElement;
-      if (closeButton) closeButton.click();
+      sidePanelCloseButton.click();
       continue; // skip this file but continue processing others
     }
 
@@ -192,11 +241,8 @@ export async function getClaudePastedContent(div: Element): Promise<string | nul
       }
     }
 
-    // close the panel
-    const closeButton = document.querySelector(
-      'button[data-testid="close-file-preview"]'
-    ) as HTMLElement;
-    if (closeButton) closeButton.click();
+    // close the side panel
+    sidePanelCloseButton.click();
   }
 
   // handle images

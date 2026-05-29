@@ -1,7 +1,7 @@
 import { extractAllClaudeArtifacts } from '@/modules/claude/artifacts';
 import {
   extractAllClaudePastedContent,
-  getClaudePastedContent,
+  getClaudeNonPastedContent,
 } from '@/modules/claude/pasted-content';
 import { extractFormattedText } from '@/modules/content-handlers';
 import { Message } from '@/modules/types';
@@ -27,6 +27,9 @@ export const getClaudeChatContent = async () => {
   const messageGroups = document.querySelectorAll('div[data-test-render-count]');
 
   messageGroups.forEach((group) => {
+    // only treat as pasted-only if this group does NOT already contain a user-message element
+    // (otherwise it would be picked up by userMessages and processed twice)
+    if (group.querySelector('[data-testid="user-message"]')) return;
     const badgeElement = group.querySelector('.text-text-300');
     if (badgeElement && badgeElement.textContent?.toLowerCase().includes('pasted')) {
       pastedOnlyMessages.push(group);
@@ -130,13 +133,13 @@ export const getClaudeChatContent = async () => {
               await new Promise((resolve) => setTimeout(resolve, 100));
             }
 
-            // also handle regular file thumbnails (non-pasted)
+            // handle non-pasted file thumbnails and images (skip pasted ones already extracted above)
             const thumbnailContainer = messageContainer?.querySelector('div.group\\/thumbnail')
               ?.parentElement?.parentElement as HTMLElement;
             if (thumbnailContainer) {
-              const regularPastedContent = await getClaudePastedContent(thumbnailContainer);
-              if (regularPastedContent) {
-                messageParts.push(regularPastedContent);
+              const nonPastedContent = await getClaudeNonPastedContent(thumbnailContainer);
+              if (nonPastedContent) {
+                messageParts.push(nonPastedContent);
                 await new Promise((resolve) => setTimeout(resolve, 100));
               }
             }
