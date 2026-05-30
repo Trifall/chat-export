@@ -35,6 +35,11 @@ Gemini AIStudio Button:
 
 ![Gemini AIStudio Export Button](https://github.com/user-attachments/assets/404c1304-12ea-4e7a-bcf8-f4ec91faf817)
 
+## Limitations
+
+- **Unsupported Attachments**: Any attachment on any of the supported sites that is not directly linkable or whose text content is not retrievable directly from the browser DOM itself cannot be included in the exported conversation.
+- **Claude Specifics**: Attached text documents in Claude can only be exported if they are previewable/rendered within the chat or artifact viewer. If the file is not previewable, the extension cannot extract its contents because no direct link is available and direct downloading is not supported.
+
 ## Contributing
 
 - If you manage to fix a bug or add a useful feature, pull requests are welcome.
