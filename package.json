@@ -22,7 +22,7 @@
     "webext-options-sync": "^4.3.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "^9.21.0",
     "@parcel/config-webextension": "^2.16.4",
     "@parcel/resolver-default": "^2.16.4",
     "@playwright/test": "1.60.0",
@@ -33,7 +33,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/webextension-polyfill": "^0.12.5",
     "class-variance-authority": "^0.7.1",
-    "eslint": "^10.4.0",
+    "eslint": "^9.21.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-tailwindcss": "^3.18.3",
