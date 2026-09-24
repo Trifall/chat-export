@@ -1,3 +1,19 @@
+export interface SweepOrderedValue<T> {
+  order: number | null;
+  sequence: number;
+  value: T;
+}
+
+export function orderSweepValues<T>(items: Array<SweepOrderedValue<T>>): Array<T> {
+  return [...items]
+    .sort(
+      (first, second) =>
+        (first.order ?? Number.MAX_SAFE_INTEGER) - (second.order ?? Number.MAX_SAFE_INTEGER) ||
+        first.sequence - second.sequence
+    )
+    .map((item) => item.value);
+}
+
 export async function sweepMountedElements(
   getElements: () => Element[],
   getKey: (element: Element) => string | null,

@@ -6,7 +6,7 @@ import {
   getPastedBlockTarget,
 } from '@/modules/claude/pasted-content';
 import { extractFormattedText } from '@/modules/content-handlers';
-import { sweepMountedElements } from '@/modules/scroll-sweep';
+import { SweepOrderedValue, orderSweepValues, sweepMountedElements } from '@/modules/scroll-sweep';
 import { Message } from '@/modules/types';
 
 /**
@@ -155,7 +155,7 @@ async function extractClaudeMessageContent(
 }
 
 export const getClaudeChatContent = async () => {
-  const collectedMessages: Array<{ order: number | null; sequence: number; message: Message }> = [];
+  const collectedMessages: Array<SweepOrderedValue<Message>> = [];
   let sequence = 0;
   const failedClaudeMessages = await sweepMountedElements(
     getClaudeMessages,
@@ -170,20 +170,12 @@ export const getClaudeChatContent = async () => {
       collectedMessages.push({
         order: getClaudeMessageOrder(element),
         sequence: sequence++,
-        message: { role, content },
+        value: { role, content },
       });
       return true;
     },
     (error) => console.error('Failed to extract Claude message:', error)
   );
 
-  const claudeMessages = collectedMessages
-    .sort(
-      (first, second) =>
-        (first.order ?? Number.MAX_SAFE_INTEGER) - (second.order ?? Number.MAX_SAFE_INTEGER) ||
-        first.sequence - second.sequence
-    )
-    .map(({ message }) => message);
-
-  return { claudeMessages, failedClaudeMessages };
+  return { claudeMessages: orderSweepValues(collectedMessages), failedClaudeMessages };
 };

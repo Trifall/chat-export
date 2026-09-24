@@ -1,6 +1,6 @@
 import { formatImageInput } from '@/modules/content-handlers';
 import { extractFormattedText } from '@/modules/content-handlers';
-import { sweepMountedElements } from '@/modules/scroll-sweep';
+import { SweepOrderedValue, orderSweepValues, sweepMountedElements } from '@/modules/scroll-sweep';
 import { Message } from '@/modules/types';
 
 async function extractChatGPTMessageContent(
@@ -120,8 +120,14 @@ async function extractChatGPTTurn(turn: Element): Promise<Message | null> {
   return content ? { role, content } : null;
 }
 
+function getChatGPTTurnOrder(turn: Element): number | null {
+  const match = (turn.getAttribute('data-testid') || '').match(/conversation-turn-(\d+)$/);
+  return match ? Number.parseInt(match[1], 10) : null;
+}
+
 export const getChatGPTChatContent = async () => {
-  const chatgptMessages: Array<Message> = [];
+  const collectedMessages: Array<SweepOrderedValue<Message>> = [];
+  let sequence = 0;
   const failedChatgptMessages = await sweepMountedElements(
     () => Array.from(document.querySelectorAll('[data-testid^="conversation-turn-"]')),
     (turn) =>
@@ -131,11 +137,15 @@ export const getChatGPTChatContent = async () => {
     async (turn) => {
       const message = await extractChatGPTTurn(turn);
       if (!message) return false;
-      chatgptMessages.push(message);
+      collectedMessages.push({
+        order: getChatGPTTurnOrder(turn),
+        sequence: sequence++,
+        value: message,
+      });
       return true;
     },
     (error) => console.error('Failed to extract message content:', error)
   );
 
-  return { chatgptMessages, failedChatgptMessages };
+  return { chatgptMessages: orderSweepValues(collectedMessages), failedChatgptMessages };
 };

@@ -34,8 +34,12 @@ export function createExportButton(): HTMLElement {
     iconSpan.textContent = 'download';
     button.appendChild(iconSpan);
   } else {
-    // original ChatGPT style
-    button.className = 'btn relative btn-secondary text-token-text-primary';
+    // match ChatGPT's ghost header buttons (Share, ...)
+    button.className =
+      'btn relative btn-ghost keyboard-focused:bg-token-surface-hover text-token-text-primary hover:bg-token-surface-hover rounded-lg max-sm:hidden';
+    // keep the wrapper out of layout so the button sits inline with the
+    // header actions instead of stacking on its own row
+    buttonContainer.style.display = 'contents';
   }
 
   if (site !== 'gemini') {
@@ -45,6 +49,24 @@ export function createExportButton(): HTMLElement {
     const buttonContent = document.createElement('div');
     buttonContent.className =
       site === 'claude' ? '' : 'flex w-full items-center justify-center gap-1.5';
+
+    if (site !== 'claude') {
+      const svgNamespace = 'http://www.w3.org/2000/svg';
+      const icon = document.createElementNS(svgNamespace, 'svg');
+      icon.setAttribute('width', '20');
+      icon.setAttribute('height', '20');
+      icon.setAttribute('viewBox', '0 0 20 20');
+      icon.setAttribute('fill', 'none');
+      icon.setAttribute('stroke', 'currentColor');
+      icon.setAttribute('stroke-width', '1.8');
+      icon.setAttribute('stroke-linecap', 'round');
+      icon.setAttribute('stroke-linejoin', 'round');
+      icon.setAttribute('aria-hidden', 'true');
+      const iconPath = document.createElementNS(svgNamespace, 'path');
+      iconPath.setAttribute('d', 'M10 2.5v10.5m0 0L6.5 9.5M10 13l3.5-3.5M3.5 17.5h13');
+      icon.appendChild(iconPath);
+      buttonContent.appendChild(icon);
+    }
 
     buttonContent.appendChild(document.createTextNode('Export'));
     button.appendChild(buttonContent);

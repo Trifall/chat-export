@@ -2,7 +2,7 @@ import {
   extractAllClaudePastedContent,
   getPastedBlockTarget,
 } from '../src/modules/claude/pasted-content';
-import { sweepMountedElements } from '../src/modules/scroll-sweep';
+import { orderSweepValues, sweepMountedElements } from '../src/modules/scroll-sweep';
 import { expect, test } from '@playwright/test';
 
 class MockElement {
@@ -73,6 +73,16 @@ test('uses the button wrapping a pasted thumbnail', () => {
   } as unknown as Element;
 
   expect(getPastedBlockTarget(flexCol, messageContainer)).toBe(button);
+});
+
+test('orders collected rows by logical index with encounter fallback', () => {
+  const values = orderSweepValues([
+    { order: 35, sequence: 0, value: 'tail' },
+    { order: 0, sequence: 1, value: 'head' },
+    { order: null, sequence: 2, value: 'unkeyed' },
+  ]);
+
+  expect(values).toEqual(['head', 'tail', 'unkeyed']);
 });
 
 test('captures every virtualized row and restores the scroll position', async () => {
