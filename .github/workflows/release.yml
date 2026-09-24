@@ -33,7 +33,9 @@ jobs:
         if: env.DAILY_VERSION_CREATED
         uses: actions/upload-artifact@v4
         with:
+          name: extension
           path: ${{ env.DIRECTORY }}
+          if-no-files-found: error
       - name: Create release
         if: env.DAILY_VERSION_CREATED
         env:
@@ -51,6 +53,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8
+        with:
+          name: extension
+          path: artifact
+
       - run: npx chrome-webstore-upload-cli@3 upload --auto-publish
         working-directory: artifact
         env:
@@ -66,6 +72,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8
+        with:
+          name: extension
+          path: artifact
+
       - run: npx web-ext@7 sign --use-submission-api --channel listed
         working-directory: artifact
         env:
