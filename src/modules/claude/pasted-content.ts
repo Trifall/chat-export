@@ -1,5 +1,64 @@
+import { readClipboardText, waitForClipboardChange } from '@/modules/claude/clipboard';
 import { SURROUND_PASTE_FILE_IN_BACKTICKS } from '@/modules/constants';
 import { formatImageInput } from '@/modules/content-handlers';
+
+function isPastedLabel(element: Element): boolean {
+  return /^pasted\b/i.test(element.textContent?.trim() || '');
+}
+
+export function findPastedCopyButton(scope: ParentNode = document): HTMLButtonElement | null {
+  return scope.querySelector(
+    'button[aria-label="Copy attachment text"]'
+  ) as HTMLButtonElement | null;
+}
+
+export function findPastedContentElement(scope: ParentNode = document): Element | null {
+  const preview = scope.querySelector('div[role="dialog"][data-state="open"], div[role="dialog"]');
+
+  return (
+    scope.querySelector('.whitespace-pre-wrap.break-all.text-xs') ??
+    scope.querySelector('div[role="document"][aria-label^="Attachment text"]') ??
+    preview?.querySelector('pre code') ??
+    preview?.querySelector('pre') ??
+    preview?.querySelector('.whitespace-pre-wrap') ??
+    preview?.querySelector('div.overflow-y-auto.whitespace-pre-wrap') ??
+    null
+  );
+}
+
+export function getAttachmentLineCount(contentElement: Element): number | null {
+  const match = (contentElement.getAttribute('aria-label') || '').match(/(\d+)\s+lines?/);
+  return match ? Number.parseInt(match[1], 10) : null;
+}
+
+export function getPastedDocumentText(contentElement: Element): string {
+  const lines = Array.from(contentElement.querySelectorAll('div[data-index]'));
+  if (lines.length > 0) {
+    lines.sort(
+      (first, second) =>
+        (Number(first.getAttribute('data-index')) || 0) -
+        (Number(second.getAttribute('data-index')) || 0)
+    );
+    return lines
+      .map((line) => (line.textContent ?? '').replace(/^[\r\n]+/, '').replace(/\s+$/, ''))
+      .join('\n')
+      .replace(/\n+$/, '');
+  }
+  return contentElement.textContent || '';
+}
+
+export function getPastedBlockTarget(
+  flexCol: Element | null,
+  messageContainer: Element
+): Element | null {
+  if (!flexCol) return null;
+
+  const inThumbnail = flexCol.closest('div[data-testid="file-thumbnail"]') !== null;
+  const isDirectAttachment = flexCol.parentElement === messageContainer;
+  if (!inThumbnail && !isDirectAttachment) return null;
+
+  return flexCol.querySelector('button') ?? flexCol.closest('button');
+}
 
 /**
  * Extract pasted content from Claude's pasted document side panel
@@ -21,7 +80,7 @@ async function extractClaudePastedContent(pastedBlock: Element): Promise<string 
       await new Promise((resolve) => setTimeout(resolve, waitTime));
 
       // find the content in the side panel
-      const contentElement = document.querySelector('.whitespace-pre-wrap.break-all.text-xs');
+      const contentElement = findPastedContentElement();
       if (!contentElement) {
         console.error('Could not find pasted content element');
         // try to close any open panel
@@ -32,7 +91,42 @@ async function extractClaudePastedContent(pastedBlock: Element): Promise<string 
           const closeBtn = closeButtons[0].closest('button') as HTMLButtonElement;
           if (closeBtn) closeBtn.click();
         }
-        return null;
+        continue;
+      }
+
+      // read the panel DOM first: the copy button depends on clipboard focus,
+      // but only trust it when all labeled lines are mounted
+      const panelText = getPastedDocumentText(contentElement);
+      const expectedLines = getAttachmentLineCount(contentElement);
+      if (panelText && (expectedLines === null || panelText.split('\n').length >= expectedLines)) {
+        const closeButton = document.querySelector(
+          'button[data-testid="close-file-preview"]'
+        ) as HTMLButtonElement;
+        if (closeButton) {
+          closeButton.click();
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+        return `${pastedTitle}\n\n\`\`\`\n${panelText}\n\`\`\``;
+      }
+
+      // fall back to the panel's copy button, which copies the full text
+      // even when the preview only mounts part of the file
+      const copyButton = findPastedCopyButton();
+      if (copyButton) {
+        const previousClipboard = await readClipboardText();
+        copyButton.click();
+        const copiedContent = await waitForClipboardChange(previousClipboard, 1500);
+        if (copiedContent) {
+          const closeButton = document.querySelector(
+            'button[data-testid="close-file-preview"]'
+          ) as HTMLButtonElement;
+          if (closeButton) {
+            closeButton.click();
+            await new Promise((resolve) => setTimeout(resolve, 200));
+          }
+          return `${pastedTitle}\n\n\`\`\`\n${copiedContent}\n\`\`\``;
+        }
+        console.warn('Pasted copy button did not yield clipboard content, trying panel text');
       }
 
       // extract the content text
@@ -97,22 +191,20 @@ export async function extractAllClaudePastedContent(messageContainer: Element): 
     const fileThumbnails = messageContainer.querySelectorAll('div[data-testid="file-thumbnail"]');
     fileThumbnails.forEach((thumbnail) => {
       const flexCol = thumbnail.querySelector('.flex-col');
-      if (flexCol) {
-        const badgeElement = flexCol.querySelector('.text-text-300');
-        if (badgeElement && badgeElement.textContent?.toLowerCase().includes('pasted')) {
-          pastedBlocks.push(flexCol);
-        }
+      const badgeElement = flexCol?.querySelector('.text-text-300');
+      const target = getPastedBlockTarget(flexCol, messageContainer);
+      if (badgeElement && isPastedLabel(badgeElement) && target && !pastedBlocks.includes(target)) {
+        pastedBlocks.push(target);
       }
     });
 
     // Also look for pasted documents that might be direct children (for pasted-only messages)
     const directPastedElements = messageContainer.querySelectorAll('.flex-col .text-text-300');
     directPastedElements.forEach((badgeElement) => {
-      if (badgeElement.textContent?.toLowerCase().includes('pasted')) {
-        const flexCol = badgeElement.closest('.flex-col');
-        if (flexCol && !pastedBlocks.includes(flexCol)) {
-          pastedBlocks.push(flexCol);
-        }
+      const flexCol = badgeElement.closest('.flex-col');
+      const target = getPastedBlockTarget(flexCol, messageContainer);
+      if (isPastedLabel(badgeElement) && target && !pastedBlocks.includes(target)) {
+        pastedBlocks.push(target);
       }
     });
 

@@ -1,9 +1,12 @@
 import { extractAllClaudeArtifacts } from '@/modules/claude/artifacts';
+import { readClipboardText, waitForClipboardChange } from '@/modules/claude/clipboard';
 import {
   extractAllClaudePastedContent,
   getClaudeNonPastedContent,
+  getPastedBlockTarget,
 } from '@/modules/claude/pasted-content';
 import { extractFormattedText } from '@/modules/content-handlers';
+import { sweepMountedElements } from '@/modules/scroll-sweep';
 import { Message } from '@/modules/types';
 
 /**
@@ -14,161 +17,173 @@ function cleanupCodeBlocks(content: string): string {
   return content.replace(/([a-zA-Z0-9_+-]+)\s*```\1\b/g, '```$1');
 }
 
-export const getClaudeChatContent = async () => {
-  // claude.ai
-  // user messages have data-testid="user-message"
-  // assistant messages have class="font-claude-response"
-  // also look for pasted-only messages (no data-testid but contain pasted documents)
-  const userMessages = document.querySelectorAll('[data-testid="user-message"]');
-  const assistantMessages = document.querySelectorAll('div.font-claude-response');
+const CLAUDE_MESSAGE_SELECTOR =
+  '[data-testid="user-message"], div.font-claude-response, div[data-test-render-count]';
 
-  // find pasted-only messages (messages that contain pasted documents but no data-testid)
-  const pastedOnlyMessages: Element[] = [];
-  const messageGroups = document.querySelectorAll('div[data-test-render-count]');
+type ClaudeMessageRole = 'user' | 'assistant' | null;
 
-  messageGroups.forEach((group) => {
-    // only treat as pasted-only if this group does NOT already contain a user-message element
-    // (otherwise it would be picked up by userMessages and processed twice)
-    if (group.querySelector('[data-testid="user-message"]')) return;
-    const badgeElement = group.querySelector('.text-text-300');
-    if (badgeElement && badgeElement.textContent?.toLowerCase().includes('pasted')) {
-      pastedOnlyMessages.push(group);
+export function isPastedOnlyMessage(element: Element): boolean {
+  return Array.from(element.querySelectorAll('.flex-col .text-text-300')).some((badge) => {
+    const flexCol = badge.closest('.flex-col');
+    return (
+      /^pasted\b/i.test(badge.textContent?.trim() || '') &&
+      getPastedBlockTarget(flexCol, element) !== null
+    );
+  });
+}
+
+function getClaudeMessageRole(element: Element): ClaudeMessageRole {
+  if (element.matches('[data-testid="user-message"]')) return 'user';
+  if (element.matches('div.font-claude-response')) return 'assistant';
+  if (
+    element.matches('div[data-test-render-count]') &&
+    !element.querySelector('[data-testid="user-message"]') &&
+    isPastedOnlyMessage(element)
+  ) {
+    return 'user';
+  }
+  return null;
+}
+
+function getClaudeMessageOrder(element: Element): number | null {
+  const row = element.closest('[data-rs-index], [data-index]');
+  const index = row?.getAttribute(
+    row?.hasAttribute('data-rs-index') ? 'data-rs-index' : 'data-index'
+  );
+  const order = index === undefined || index === null ? NaN : Number.parseInt(index, 10);
+  return Number.isInteger(order) ? order : null;
+}
+
+function getClaudeMessageKey(element: Element): string | null {
+  const role = getClaudeMessageRole(element);
+  const row = element.closest('[data-rs-index], [data-index]');
+  if (!role || !row) return null;
+
+  const indexName = row.hasAttribute('data-rs-index') ? 'data-rs-index' : 'data-index';
+  const index = row.getAttribute(indexName);
+  if (index === null) return null;
+
+  const roleIndex = Array.from(row.querySelectorAll(CLAUDE_MESSAGE_SELECTOR))
+    .filter((candidate) => getClaudeMessageRole(candidate) === role)
+    .indexOf(element);
+  return `${indexName}:${index}:${role}:${roleIndex}`;
+}
+
+function getClaudeMessages(): Element[] {
+  return Array.from(document.querySelectorAll(CLAUDE_MESSAGE_SELECTOR)).filter(
+    (element) => getClaudeMessageRole(element) !== null
+  );
+}
+
+async function extractClaudeMessageContent(
+  element: Element,
+  role: Exclude<ClaudeMessageRole, null>
+): Promise<string | null> {
+  let content = '';
+
+  if (role === 'assistant') {
+    const messageGroup = element.closest('[data-is-streaming]')?.parentElement;
+    const actionBar = messageGroup?.querySelector(
+      'button[data-testid="action-bar-copy"]'
+    ) as HTMLButtonElement | null;
+    const bodyClone = element.cloneNode(true) as Element;
+    bodyClone.querySelectorAll('[data-sheet-kind]').forEach((card) => card.remove());
+
+    content = await extractFormattedText(bodyClone);
+    if (!content.trim() && actionBar) {
+      actionBar.click();
+      const previousClipboard = await readClipboardText();
+      content = cleanupCodeBlocks(await waitForClipboardChange(previousClipboard, 1000));
     }
-  });
 
-  let failedClaudeMessages = 0;
-  const claudeMessages: Array<Message> = [];
+    const messageContainer = messageGroup || element.closest('[data-test-render-count]');
+    if (messageContainer) {
+      const artifacts = await extractAllClaudeArtifacts(messageContainer);
+      if (artifacts.length > 0) {
+        content += '\n\n' + artifacts.join('\n\n');
+      }
+    }
+  } else {
+    const messageParts: string[] = [];
+    const isPastedOnlyMessage = !element.hasAttribute('data-testid');
 
-  // create a combined list with position info for ordering
-  const allMessages: Array<{ element: Element; role: string; position: number }> = [];
+    if (isPastedOnlyMessage) {
+      const pastedContents = await extractAllClaudePastedContent(element);
+      if (pastedContents.length > 0) {
+        pastedContents.forEach((pastedContent, index) => {
+          messageParts.push(`Pasted Content #${index + 1}:\n\n${pastedContent}`);
+        });
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    } else {
+      const bodyClone = element.cloneNode(true) as Element;
+      bodyClone
+        .querySelectorAll('div[data-testid="file-thumbnail"]')
+        .forEach((thumbnail) => thumbnail.remove());
+      const textContent = await extractFormattedText(bodyClone);
+      const messageContainer = element.closest('[data-test-render-count]');
 
-  userMessages.forEach((el) => {
-    const rect = el.getBoundingClientRect();
-    // use document position for ordering
-    const position = rect.top + window.scrollY;
-    allMessages.push({ element: el, role: 'user', position });
-  });
-
-  assistantMessages.forEach((el) => {
-    const rect = el.getBoundingClientRect();
-    const position = rect.top + window.scrollY;
-    allMessages.push({ element: el, role: 'assistant', position });
-  });
-
-  // add pasted-only messages as user messages
-  pastedOnlyMessages.forEach((el) => {
-    const rect = el.getBoundingClientRect();
-    const position = rect.top + window.scrollY;
-    allMessages.push({ element: el, role: 'user', position });
-  });
-
-  // sort by position (top to bottom)
-  allMessages.sort((a, b) => a.position - b.position);
-
-  for (const { element: div, role } of allMessages) {
-    try {
-      let content = '';
-
-      if (role === 'assistant') {
-        // for assistant messages, find the copy button in the action bar
-        // the action bar is in a sibling div with class "absolute"
-        const messageGroup = div.closest('[data-is-streaming]')?.parentElement;
-        const actionBar = messageGroup?.querySelector(
-          'button[data-testid="action-bar-copy"]'
-        ) as HTMLButtonElement;
-
-        if (actionBar) {
-          actionBar.click();
-          // wait for clipboard to be updated
+      if (messageContainer) {
+        const pastedContents = await extractAllClaudePastedContent(messageContainer);
+        if (pastedContents.length > 0) {
+          pastedContents.forEach((pastedContent, index) => {
+            messageParts.push(`Pasted Content #${index + 1}:\n\n${pastedContent}`);
+          });
           await new Promise((resolve) => setTimeout(resolve, 100));
-          content = await navigator.clipboard.readText();
-          // clean up duplicate language labels in code blocks
-          content = cleanupCodeBlocks(content);
-        } else {
-          // fallback: extract text directly using our formatter
-          content = await extractFormattedText(div);
         }
 
-        // extract artifacts from this assistant message
-        // the parent container or a nearby element should contain artifact blocks
-        const messageContainer = messageGroup || div.closest('[data-test-render-count]');
-        if (messageContainer) {
-          const artifacts = await extractAllClaudeArtifacts(messageContainer);
-          if (artifacts.length > 0) {
-            // append artifacts to the message content
-            content += '\n\n' + artifacts.join('\n\n');
-          }
-        }
-      } else {
-        // for user messages, handle regular text, code blocks, and pasted content
-        const messageParts: string[] = [];
-
-        // check if this is a pasted-only message (no data-testid attribute)
-        const isPastedOnlyMessage = !div.hasAttribute('data-testid');
-
-        if (isPastedOnlyMessage) {
-          // this is a pasted-only message, extract pasted content directly from the message element
-          const pastedContents = await extractAllClaudePastedContent(div);
-          if (pastedContents.length > 0) {
-            // format pasted content with indices
-            pastedContents.forEach((pastedContent, index) => {
-              messageParts.push(`Pasted Content #${index + 1}:\n\n${pastedContent}`);
-            });
+        const thumbnailContainer =
+          messageContainer.querySelector('div.group\\/thumbnail')?.parentElement?.parentElement;
+        if (thumbnailContainer) {
+          const nonPastedContent = await getClaudeNonPastedContent(thumbnailContainer);
+          if (nonPastedContent) {
+            messageParts.push(nonPastedContent);
             await new Promise((resolve) => setTimeout(resolve, 100));
           }
-        } else {
-          // this is a regular user message, handle both pasted content and text
-          // look for pasted/attached content (images, files)
-          // find the parent message container and look for thumbnails
-          const messageContainer = div.closest('[data-test-render-count]');
-
-          if (messageContainer) {
-            // extract pasted content from pasted document blocks
-            const pastedContents = await extractAllClaudePastedContent(messageContainer);
-            if (pastedContents.length > 0) {
-              // format pasted content with indices
-              pastedContents.forEach((pastedContent, index) => {
-                messageParts.push(`Pasted Content #${index + 1}:\n\n${pastedContent}`);
-              });
-              await new Promise((resolve) => setTimeout(resolve, 100));
-            }
-
-            // handle non-pasted file thumbnails and images (skip pasted ones already extracted above)
-            const thumbnailContainer = messageContainer?.querySelector('div.group\\/thumbnail')
-              ?.parentElement?.parentElement as HTMLElement;
-            if (thumbnailContainer) {
-              const nonPastedContent = await getClaudeNonPastedContent(thumbnailContainer);
-              if (nonPastedContent) {
-                messageParts.push(nonPastedContent);
-                await new Promise((resolve) => setTimeout(resolve, 100));
-              }
-            }
-          }
-
-          // extract text content from user message
-          const textContent = await extractFormattedText(div);
-          if (textContent) {
-            messageParts.push(textContent);
-          }
-        }
-
-        content = messageParts.join('\n');
-        if (!content) {
-          failedClaudeMessages++;
-          continue;
         }
       }
 
-      if (content.trim()) {
-        claudeMessages.push({ role, content });
-      } else {
-        failedClaudeMessages++;
+      if (textContent) {
+        messageParts.push(textContent);
       }
-    } catch (error) {
-      console.error('Failed to extract Claude message:', error);
-      failedClaudeMessages++;
     }
+
+    content = messageParts.join('\n');
   }
+
+  return content.trim() ? content : null;
+}
+
+export const getClaudeChatContent = async () => {
+  const collectedMessages: Array<{ order: number | null; sequence: number; message: Message }> = [];
+  let sequence = 0;
+  const failedClaudeMessages = await sweepMountedElements(
+    getClaudeMessages,
+    getClaudeMessageKey,
+    async (element) => {
+      const role = getClaudeMessageRole(element);
+      if (!role) return false;
+
+      const content = await extractClaudeMessageContent(element, role);
+      if (!content) return false;
+
+      collectedMessages.push({
+        order: getClaudeMessageOrder(element),
+        sequence: sequence++,
+        message: { role, content },
+      });
+      return true;
+    },
+    (error) => console.error('Failed to extract Claude message:', error)
+  );
+
+  const claudeMessages = collectedMessages
+    .sort(
+      (first, second) =>
+        (first.order ?? Number.MAX_SAFE_INTEGER) - (second.order ?? Number.MAX_SAFE_INTEGER) ||
+        first.sequence - second.sequence
+    )
+    .map(({ message }) => message);
 
   return { claudeMessages, failedClaudeMessages };
 };

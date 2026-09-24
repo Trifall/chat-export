@@ -7,6 +7,9 @@ export async function extractFormattedText(element: Element): Promise<string> {
 
     function extractText(node: Node, isInListItem: boolean = false) {
       if (node instanceof Element) {
+        if (node.getAttribute('aria-hidden') === 'true') {
+          return;
+        }
         if (
           node.querySelector('svg[aria-label="Sources"]') ||
           node.textContent?.trim() === 'Sources' ||
@@ -19,24 +22,36 @@ export async function extractFormattedText(element: Element): Promise<string> {
       }
 
       if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent?.trim();
-        if (text) formattedText += text;
+        const rawText = node.textContent || '';
+        if (!rawText.trim()) {
+          if (formattedText && !formattedText.endsWith('\n') && !formattedText.endsWith(' ')) {
+            formattedText += ' ';
+          }
+          return;
+        }
+        let text = rawText.replace(/\s+/g, ' ');
+        if (formattedText === '' || formattedText.endsWith('\n')) {
+          text = text.replace(/^ /, '');
+        }
+        formattedText += text;
       } else if (node.nodeName === 'PRE') {
         const preElement = node as Element;
         const codeElement = preElement.querySelector('code');
         const language = codeElement?.className.replace('language-', '').trim() || '';
-        const codeContent = getCodeBlockContent(preElement);
-        formattedText += '```' + (language ? language + '\n' : '\n') + codeContent + '\n```\n';
+        const codeContent = getCodeBlockContent(codeElement || preElement);
+        formattedText += '\n```' + (language ? language + '\n' : '\n') + codeContent + '\n```\n';
       } else if (node.nodeName === 'CODE' && node.parentElement?.nodeName !== 'PRE') {
         formattedText += '`' + node.textContent + '`';
       } else if (node.nodeName === 'UL' || node.nodeName === 'OL') {
+        if (listLevel === 0) formattedText += '\n';
         listLevel++;
         for (let i = 0; i < node.childNodes.length; i++) {
           extractText(node.childNodes[i], true);
         }
         listLevel--;
-        if (listLevel === 0) formattedText += '\n';
+        if (listLevel === 0) formattedText += '\n\n';
       } else if (node.nodeName === 'LI') {
+        formattedText = formattedText.replace(/ +$/, '');
         formattedText += '\n' + getIndentation(listLevel - 1) + '- ';
         // Process all child nodes of the list item
         for (let i = 0; i < node.childNodes.length; i++) {
@@ -49,25 +64,31 @@ export async function extractFormattedText(element: Element): Promise<string> {
             extractText(child, true);
           }
         }
+      } else if (node.nodeName === 'TABLE') {
+        appendMarkdownTable(node as Element);
       } else if (node.nodeName === 'P') {
-        if (!isInListItem) formattedText += '\n';
+        if (!isInListItem) formattedText += '\n\n';
         for (let i = 0; i < node.childNodes.length; i++) {
           extractText(node.childNodes[i], isInListItem);
         }
-        if (!isInListItem) formattedText += '\n';
+        if (!isInListItem) {
+          formattedText = formattedText.replace(/ +$/, '');
+          formattedText += '\n\n';
+        }
       } else if (node.nodeName === 'H1') {
-        formattedText += '\n# ' + node.textContent + '\n';
+        formattedText += '\n# ' + node.textContent?.trim() + '\n';
       } else if (node.nodeName === 'H2') {
-        formattedText += '\n## ' + node.textContent + '\n';
+        formattedText += '\n## ' + node.textContent?.trim() + '\n';
       } else if (node.nodeName === 'H3') {
-        formattedText += '\n### ' + node.textContent + '\n';
+        formattedText += '\n### ' + node.textContent?.trim() + '\n';
       } else if (node.nodeName === 'STRONG' || node.nodeName === 'B') {
-        formattedText += '**' + node.textContent + '**';
+        formattedText += '**' + (node.textContent || '').replace(/\s+/g, ' ').trim() + '**';
       } else if (node.nodeName === 'EM' || node.nodeName === 'I') {
-        formattedText += '*' + node.textContent + '*';
+        formattedText += '*' + (node.textContent || '').replace(/\s+/g, ' ').trim() + '*';
       } else if (node.nodeName === 'A') {
         const href = (node as HTMLAnchorElement).href;
-        formattedText += '[' + node.textContent + '](' + href + ')';
+        formattedText +=
+          '[' + (node.textContent || '').replace(/\s+/g, ' ').trim() + '](' + href + ')';
       } else {
         for (let i = 0; i < node.childNodes.length; i++) {
           extractText(node.childNodes[i], isInListItem);
@@ -117,6 +138,63 @@ export async function extractFormattedText(element: Element): Promise<string> {
       return Array.from(node.childNodes)
         .map((childNode) => getTextWithLineBreaks(childNode))
         .join('');
+    }
+
+    function getTableCellText(cell: Node): string {
+      const parts: string[] = [];
+      const appendInlineText = (node: Node): void => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          parts.push((node.textContent || '').replace(/\s+/g, ' '));
+        } else if (node.nodeName === 'BR') {
+          parts.push(' ');
+        } else if (node.nodeName === 'STRONG' || node.nodeName === 'B') {
+          parts.push('**');
+          Array.from(node.childNodes).forEach(appendInlineText);
+          parts.push('**');
+        } else if (node.nodeName === 'EM' || node.nodeName === 'I') {
+          parts.push('*');
+          Array.from(node.childNodes).forEach(appendInlineText);
+          parts.push('*');
+        } else if (node.nodeName === 'CODE' && node.parentElement?.nodeName !== 'PRE') {
+          parts.push(`\`${(node.textContent || '').replace(/\s+/g, ' ').trim()}\``);
+        } else if (node.nodeName === 'A') {
+          parts.push('[');
+          Array.from(node.childNodes).forEach(appendInlineText);
+          parts.push(`](${(node as HTMLAnchorElement).href})`);
+        } else {
+          Array.from(node.childNodes).forEach(appendInlineText);
+        }
+      };
+
+      appendInlineText(cell);
+      return parts.join('').replace(/\s+/g, ' ').trim().replace(/\|/g, '\\|');
+    }
+
+    function appendMarkdownTable(table: Element): void {
+      const rows = Array.from(
+        table.querySelectorAll(
+          ':scope > tr, :scope > thead > tr, :scope > tbody > tr, :scope > tfoot > tr'
+        )
+      )
+        .map((row) =>
+          Array.from(row.children)
+            .filter((cell) => cell.tagName === 'TH' || cell.tagName === 'TD')
+            .map((cell) => getTableCellText(cell))
+        )
+        .filter((row) => row.length > 0);
+      if (rows.length === 0) return;
+
+      const columnCount = Math.max(...rows.map((row) => row.length));
+      const normalizedRows = rows.map((row) => [
+        ...row,
+        ...Array(columnCount - row.length).fill(''),
+      ]);
+      formattedText += `\n${normalizedRows[0].join(' | ')}\n`;
+      formattedText += `${normalizedRows[0].map(() => '---').join(' | ')}\n`;
+      for (let index = 1; index < normalizedRows.length; index++) {
+        formattedText += `${normalizedRows[index].join(' | ')}\n`;
+      }
+      formattedText += '\n';
     }
 
     extractText(element);

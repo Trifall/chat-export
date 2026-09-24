@@ -5,45 +5,35 @@ import {
   handleThinkingMessage,
   performTurnScroll,
 } from '@/modules/gemini/gemini-helpers';
+import { sweepMountedElements } from '@/modules/scroll-sweep';
 import { Message } from '@/modules/types';
 
 export const getGeminiChatContent = async () => {
-  // aistudio.google.com (Gemini)
-  const chatTurns = document.querySelectorAll('ms-chat-turn');
-
-  let failedGeminiMessages = 0;
   const geminiMessages: Array<Message> = [];
-
-  for (const turn of chatTurns) {
-    try {
+  const failedGeminiMessages = await sweepMountedElements(
+    () => Array.from(document.querySelectorAll('ms-chat-turn')),
+    (turn) =>
+      turn.id ||
+      turn.getAttribute('data-turn-id') ||
+      turn.closest('[data-index]')?.getAttribute('data-index') ||
+      null,
+    async (turn) => {
       await closeExistingOverlays();
       await performTurnScroll(turn);
 
       const { role, container } = extractRoleFromTurn(turn);
-      if (!container) {
-        failedGeminiMessages++;
-        continue;
-      }
+      if (!container) return false;
 
-      // Handle thinking messages
-      if (await handleThinkingMessage(turn, role, geminiMessages)) {
-        continue;
-      }
+      if (await handleThinkingMessage(turn, role, geminiMessages)) return true;
 
-      // Handle regular messages via edit mode
       const content = await extractContentViaEditMode(turn);
-      if (content?.trim()) {
-        geminiMessages.push({ role, content: content.trim() });
-      } else {
-        failedGeminiMessages++;
-      }
-    } catch (error) {
-      console.error('Failed to extract Gemini message:', error);
-      failedGeminiMessages++;
-    }
+      if (!content?.trim()) return false;
 
-    await new Promise((resolve) => setTimeout(resolve, 25)); // Rate limiting
-  }
+      geminiMessages.push({ role, content: content.trim() });
+      return true;
+    },
+    (error) => console.error('Failed to extract Gemini message:', error)
+  );
 
   return { geminiMessages, failedGeminiMessages };
 };

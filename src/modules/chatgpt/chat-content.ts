@@ -1,5 +1,6 @@
 import { formatImageInput } from '@/modules/content-handlers';
 import { extractFormattedText } from '@/modules/content-handlers';
+import { sweepMountedElements } from '@/modules/scroll-sweep';
 import { Message } from '@/modules/types';
 
 async function extractChatGPTMessageContent(
@@ -90,71 +91,51 @@ function formatChatGPTThinkingLabel(text: string | null): string | null {
   return trimmedText;
 }
 
-export const getChatGPTChatContent = async () => {
-  // get all conversation turns
-  const turns = document.querySelectorAll('[data-testid^="conversation-turn-"]');
+async function extractChatGPTTurn(turn: Element): Promise<Message | null> {
+  const messageDivs = Array.from(turn.querySelectorAll('[data-message-author-role]'));
+  const role = messageDivs[0]?.getAttribute('data-message-author-role');
+  if (!role) return null;
 
-  let failedChatgptMessages = 0;
-  const chatgptMessages: Array<Message> = [];
+  const turnParts = Array.from(turn.querySelectorAll('[data-message-author-role], button'));
+  const contentParts: string[] = [];
 
-  // process each turn individually
-  for (const turn of turns) {
-    const messageDivs = Array.from(turn.querySelectorAll('[data-message-author-role]'));
-    if (!messageDivs.length) {
-      failedChatgptMessages++;
+  for (const turnPart of turnParts) {
+    if (turnPart.hasAttribute('data-message-author-role')) {
+      const messageRole = turnPart.getAttribute('data-message-author-role') || role;
+      const contentPart = await extractChatGPTMessageContent(turnPart, messageRole);
+
+      if (contentPart) {
+        contentParts.push(contentPart);
+      }
       continue;
     }
 
-    const role = messageDivs[0]?.getAttribute('data-message-author-role');
-    if (!role) {
-      failedChatgptMessages++;
-      continue;
-    }
-
-    // scroll this specific turn into view to ensure it's loaded
-    const block = role === 'assistant' ? 'end' : 'start';
-    turn.scrollIntoView({
-      behavior: 'instant',
-      block,
-    });
-
-    // wait for content to load
-    await new Promise((resolve) => setTimeout(resolve, 250));
-
-    try {
-      const turnParts = Array.from(turn.querySelectorAll('[data-message-author-role], button'));
-      const contentParts: string[] = [];
-
-      for (const turnPart of turnParts) {
-        if (turnPart.hasAttribute('data-message-author-role')) {
-          const messageDiv = turnPart;
-          const messageRole = messageDiv.getAttribute('data-message-author-role') || role;
-          const contentPart = await extractChatGPTMessageContent(messageDiv, messageRole);
-
-          if (contentPart) {
-            contentParts.push(contentPart);
-          }
-          continue;
-        }
-
-        const thinkingLabel = formatChatGPTThinkingLabel(turnPart.textContent);
-        if (thinkingLabel) {
-          contentParts.push(thinkingLabel);
-        }
-      }
-
-      const content = contentParts.filter(Boolean).join('\n\n').trim();
-
-      if (content) {
-        chatgptMessages.push({ role, content });
-      } else {
-        failedChatgptMessages++;
-      }
-    } catch (error) {
-      console.error('Failed to extract message content:', error);
-      failedChatgptMessages++;
+    const thinkingLabel = formatChatGPTThinkingLabel(turnPart.textContent);
+    if (thinkingLabel) {
+      contentParts.push(thinkingLabel);
     }
   }
+
+  const content = contentParts.filter(Boolean).join('\n\n').trim();
+  return content ? { role, content } : null;
+}
+
+export const getChatGPTChatContent = async () => {
+  const chatgptMessages: Array<Message> = [];
+  const failedChatgptMessages = await sweepMountedElements(
+    () => Array.from(document.querySelectorAll('[data-testid^="conversation-turn-"]')),
+    (turn) =>
+      turn.getAttribute('data-turn-id') ??
+      turn.getAttribute('data-message-id') ??
+      turn.getAttribute('data-testid'),
+    async (turn) => {
+      const message = await extractChatGPTTurn(turn);
+      if (!message) return false;
+      chatgptMessages.push(message);
+      return true;
+    },
+    (error) => console.error('Failed to extract message content:', error)
+  );
 
   return { chatgptMessages, failedChatgptMessages };
 };

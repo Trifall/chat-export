@@ -5,3 +5,6 @@ dist
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+opencode*
+build.zip

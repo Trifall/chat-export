@@ -16,14 +16,14 @@ export async function performTurnScroll(turn: Element) {
 
   window.scrollTo({
     top: turnBottom - window.innerHeight + 100, // scroll so bottom of turn is visible
-    behavior: 'smooth',
+    behavior: 'instant',
   });
 
   await new Promise((resolve) => setTimeout(resolve, 800)); // wait for bottom content to load
 
   // scroll to the top/start of the turn
   turn.scrollIntoView({
-    behavior: 'smooth',
+    behavior: 'instant',
     block: 'start',
   });
 

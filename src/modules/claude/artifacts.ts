@@ -1,29 +1,143 @@
+import { readClipboardText, waitForClipboardChange } from '@/modules/claude/clipboard';
+
+export function findArtifactCopyButton(scope: ParentNode = document): HTMLButtonElement | null {
+  const splitButton = Array.from(
+    scope.querySelectorAll('div[data-cds="SplitDropdownButton"][aria-label="Copy"] button')
+  ).find((button) => button.textContent?.trim() === 'Copy');
+  if (splitButton) return splitButton as HTMLButtonElement;
+
+  // find the Copy button for the artifact panel
+  // is NOT the action-bar-copy button (which has a data-testid)
+  const allCopyButtons = scope.querySelectorAll('button');
+  for (const btn of allCopyButtons) {
+    const buttonText = btn.textContent?.trim();
+    // skip action bar copy buttons (they have data-testid)
+    if (btn.hasAttribute('data-testid')) continue;
+    // look for button with exactly "Copy" text
+    if (buttonText === 'Copy') {
+      // verify this is in the artifact panel by checking if near the code block
+      // artifact panel copy button should have a sibling dropdown button
+      const nextSibling = btn.nextElementSibling;
+      if (nextSibling?.tagName === 'BUTTON') {
+        return btn as HTMLButtonElement;
+      }
+    }
+  }
+  return null;
+}
+
+async function closeArtifactPanel(
+  panel: Element | null,
+  copyButton: HTMLButtonElement | null
+): Promise<void> {
+  const explicitClose = panel?.querySelector(
+    'button[aria-label="Close artifact"]'
+  ) as HTMLButtonElement | null;
+  if (explicitClose && explicitClose !== copyButton) {
+    explicitClose.click();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    return;
+  }
+
+  const panelContainer =
+    copyButton?.closest('div[class*="flex"][class*="h-full"]') ||
+    copyButton?.closest('div')?.parentElement?.parentElement;
+
+  if (panelContainer) {
+    // find a close button within the panel - look for the last button or one with X-like icon
+    const panelButtons = panelContainer.querySelectorAll('button');
+    const closeButton = panelButtons[panelButtons.length - 1] as HTMLButtonElement;
+    if (closeButton && closeButton !== copyButton) {
+      closeButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+}
+
 /**
  * Extract artifact code from Claude's artifact panel
  * @param artifactBlock - The artifact block element to click
  * @returns The extracted code with title and language fence, or null if extraction failed
  */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitFor<T>(
+  getValue: () => T | null | Promise<T | null>,
+  timeout: number
+): Promise<T | null> {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    const value = await getValue();
+    if (value) return value;
+    if (Date.now() >= deadline) return null;
+    await sleep(100);
+  }
+}
+
+export function getArtifactCodeText(codeElement: Element): string {
+  const groupedLines = Array.from(
+    codeElement.querySelectorAll('span[data-code-line-group] > span')
+  );
+  const lineSpans =
+    groupedLines.length > 0
+      ? groupedLines
+      : Array.from(codeElement.querySelectorAll('span.block')).filter(
+          (span) => !span.querySelector('span.block')
+        );
+  if (lineSpans.length === 0) {
+    return (codeElement.textContent || '').replace(/\r\n?/g, '\n').replace(/\n+$/, '');
+  }
+  return lineSpans
+    .map((span) => (span.textContent ?? '').replace(/^[\r\n]+/, '').replace(/\s+$/, ''))
+    .join('\n')
+    .replace(/\n+$/, '');
+}
+
 async function extractClaudeArtifact(artifactBlock: Element): Promise<string | null> {
   const MAX_RETRIES = 3;
-  const BASE_WAIT_TIME = 1500; // increased from 1000ms
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       // extract the artifact title before clicking
       // find the flex-col container which has the title as first child and type as second child
       const flexCol = artifactBlock.querySelector('.flex-col');
-      const artifactTitle = flexCol?.children[0]?.textContent?.trim() || 'Untitled Artifact';
+      const titleElement = artifactBlock.querySelector('.truncate.text-heading');
+      const subtitleElement = artifactBlock.querySelector('.truncate.text-footnote');
+      const viewButton = artifactBlock.querySelector('button[aria-label^="View "]');
+      const viewTitle = viewButton
+        ?.getAttribute('aria-label')
+        ?.replace(/^View\s+/, '')
+        .trim();
+      const subtitle = subtitleElement?.textContent?.trim().replace(/\s+/g, ' ');
+      const artifactTitle =
+        titleElement?.textContent?.trim() ||
+        viewTitle ||
+        flexCol?.children[0]?.textContent?.trim() ||
+        'Untitled Artifact';
+      const artifactHeading = subtitle ? `${artifactTitle} (${subtitle})` : artifactTitle;
 
       // click the artifact block to open the side panel
-      (artifactBlock as HTMLElement).click();
+      const openButton = artifactBlock.matches('[data-sheet-kind]')
+        ? (artifactBlock.querySelector('button[aria-label^="View "], button') as HTMLElement | null)
+        : null;
+      ((openButton ?? artifactBlock) as HTMLElement).click();
 
-      // wait for the side panel to open and load content
-      // increase wait time for each retry attempt
-      const waitTime = BASE_WAIT_TIME + attempt * 500;
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
+      // wait for the side panel to open
+      const panel = await waitFor(
+        () => document.querySelector('[role="region"][aria-label^="Artifact panel:"]'),
+        2000
+      );
+      if (!panel) {
+        console.error('Could not find artifact panel');
+        continue;
+      }
 
       // find the segmented control to check/switch to Code tab
-      const segmentedControl = document.querySelector('[role="group"].group\\/segmented-control');
+      const segmentedControl =
+        panel.querySelector('[role="group"].group\\/segmented-control') ??
+        document.querySelector('[role="group"].group\\/segmented-control');
       if (segmentedControl) {
         // find the Code button
         const codeButton = segmentedControl.querySelector(
@@ -45,49 +159,11 @@ async function extractClaudeArtifact(artifactBlock: Element): Promise<string | n
         // if no Preview button, assume already on Code view (code-only artifact)
       }
 
-      // find the Copy button for the artifact panel
-      // is NOT the action-bar-copy button (which has a data-testid)
-      let copyButton: HTMLButtonElement | null = null;
-
-      const allCopyButtons = document.querySelectorAll('button');
-      for (const btn of allCopyButtons) {
-        const buttonText = btn.textContent?.trim();
-        // skip action bar copy buttons (they have data-testid)
-        if (btn.hasAttribute('data-testid')) continue;
-        // look for button with exactly "Copy" text
-        if (buttonText === 'Copy') {
-          // verify this is in the artifact panel by checking if near the code block
-          // artifact panel copy button should have a sibling dropdown button
-          const nextSibling = btn.nextElementSibling;
-          if (nextSibling?.tagName === 'BUTTON') {
-            copyButton = btn as HTMLButtonElement;
-            break;
-          }
-        }
-      }
-
-      if (!copyButton) {
-        console.error('Could not find artifact copy button');
-        // try to close any open panel
-        const closeButtons = document.querySelectorAll(
-          'button[aria-label="Close"], button svg path[d*="15.8536"]'
-        );
-        if (closeButtons.length > 0) {
-          const closeBtn = closeButtons[0].closest('button') as HTMLButtonElement;
-          if (closeBtn) closeBtn.click();
-        }
-        return null;
-      }
-
       // try to detect the programming language from the code element
       let language = '';
 
-      // get the parent of the segmented control
-      const copyButtonSuperParent =
-        copyButton?.parentElement?.parentElement?.parentElement?.parentElement;
-
       // find the artifact panel first, then search within it for the code element
-      const codeElement = copyButtonSuperParent?.querySelector('.code-block__code code');
+      const codeElement = panel?.querySelector('.code-block__code code');
 
       if (codeElement) {
         // look for language class like "language-rust", "language-javascript", etc.
@@ -97,47 +173,32 @@ async function extractClaudeArtifact(artifactBlock: Element): Promise<string | n
         }
       }
 
-      // click copy and get clipboard content
-      copyButton.click();
-      await new Promise((resolve) => setTimeout(resolve, 200)); // increased wait time
-      const artifactCode = await navigator.clipboard.readText();
+      // read the code straight from the panel DOM; the copy button depends on
+      // clipboard focus and is only a fallback when the panel has no code yet
+      let artifactCode = codeElement ? getArtifactCodeText(codeElement) : '';
+      let copyButton: HTMLButtonElement | null = null;
+      if (!artifactCode) {
+        copyButton = await waitFor(() => findArtifactCopyButton(panel), 2000);
+        if (copyButton) {
+          const previousClipboard = await readClipboardText();
+          copyButton.click();
+          artifactCode = await waitForClipboardChange(previousClipboard, 1000);
+        } else {
+          console.error('Could not find artifact copy button');
+        }
+      }
 
       // verify that we got actual code, not conversation text
       if (artifactCode) {
-        // close the artifact panel
-        const panelContainer =
-          copyButton.closest('div[class*="flex"][class*="h-full"]') ||
-          copyButton.closest('div')?.parentElement?.parentElement;
-
-        if (panelContainer) {
-          // find a close button within the panel - look for the last button or one with X-like icon
-          const panelButtons = panelContainer.querySelectorAll('button');
-          const closeButton = panelButtons[panelButtons.length - 1] as HTMLButtonElement;
-          if (closeButton && closeButton !== copyButton) {
-            closeButton.click();
-            await new Promise((resolve) => setTimeout(resolve, 200));
-          }
-        }
+        await closeArtifactPanel(panel, copyButton);
 
         // return formatted with title and as a fenced code block
-        return `Artifact: ${artifactTitle}\n\n\`\`\`${language}\n${artifactCode}\n\`\`\``;
+        return `Artifact: ${artifactHeading}\n\n\`\`\`${language}\n${artifactCode}\n\`\`\``;
       } else {
         console.warn(
           `Artifact extraction attempt ${attempt + 1}: Invalid content detected, retrying...`
         );
-        // close panel and retry
-        const panelContainer =
-          copyButton.closest('div[class*="flex"][class*="h-full"]') ||
-          copyButton.closest('div')?.parentElement?.parentElement;
-
-        if (panelContainer) {
-          const panelButtons = panelContainer.querySelectorAll('button');
-          const closeButton = panelButtons[panelButtons.length - 1] as HTMLButtonElement;
-          if (closeButton && closeButton !== copyButton) {
-            closeButton.click();
-            await new Promise((resolve) => setTimeout(resolve, 200));
-          }
-        }
+        await closeArtifactPanel(panel, copyButton);
 
         // continue to next retry
         continue;
@@ -169,7 +230,9 @@ export async function extractAllClaudeArtifacts(messageContainer: Element): Prom
   try {
     // find all artifact blocks in this message
     // use only .artifact-block-cell to avoid duplicates from nested elements
-    const artifactBlocks = messageContainer.querySelectorAll('.artifact-block-cell');
+    const artifactBlocks = messageContainer.querySelectorAll(
+      '.artifact-block-cell, [data-sheet-kind]'
+    );
 
     console.log(`Found ${artifactBlocks.length} artifact blocks in message container`);
 
@@ -217,7 +280,7 @@ export async function extractAllClaudeArtifacts(messageContainer: Element): Prom
       }
 
       // small delay between artifacts to prevent overwhelming the UI
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await sleep(100);
     }
 
     if (extractionErrors > 0) {
