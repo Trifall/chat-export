@@ -79,7 +79,11 @@ function init() {
         }
       } else {
         // for ChatGPT, look for the share button
-        const shareButton = document.querySelector('[data-testid="share-chat-button"]');
+        const shareButton =
+          document.querySelector('[data-testid="share-chat-button"]') ||
+          document.querySelector(
+            '[data-testid="app-shell-header-context-menu-surface"] button[aria-label="Share"], button[aria-label="Share"]'
+          );
         if (shareButton && !document.querySelector('[data-testid="export-chat-button"]')) {
           const exportButton = createExportButton();
           shareButton.parentElement?.insertBefore(exportButton, shareButton);

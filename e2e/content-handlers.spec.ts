@@ -178,6 +178,83 @@ test('strips code block headers from fences', async () => {
   }
 });
 
+test('renders markdown code blocks without their headers', async () => {
+  const originalElement = globalThis.Element;
+  const originalNode = globalThis.Node;
+  Object.assign(globalThis, { Element: FakeElement, Node: { TEXT_NODE: 3 } });
+
+  try {
+    const block = new FakeElement('DIV');
+    block.getAttribute = () => 'code-block';
+    const header = new FakeElement('DIV');
+    header.textContent = 'TypeScript';
+    header.querySelector = () => null;
+    const code = new FakeElement('CODE');
+    const codeText = new FakeText('const x = 1');
+    codeText.parentElement = code;
+    code.childNodes = [codeText];
+    block.childNodes = [header, code];
+    block.childNodes.forEach((child) => {
+      child.parentElement = block;
+    });
+    block.querySelector = (selector: string) => {
+      if (selector === 'code') return code;
+      if (selector.includes('exclude')) return header;
+      return null;
+    };
+
+    await expect(extractFormattedText(block as unknown as Element)).resolves.toBe(
+      '```TypeScript\nconst x = 1\n```'
+    );
+  } finally {
+    Object.assign(globalThis, { Element: originalElement, Node: originalNode });
+  }
+});
+
+test('skips excluded subtrees', async () => {
+  const originalElement = globalThis.Element;
+  const originalNode = globalThis.Node;
+  Object.assign(globalThis, { Element: FakeElement, Node: { TEXT_NODE: 3 } });
+
+  try {
+    const container = new FakeElement('DIV');
+    const excluded = new FakeElement('DIV');
+    excluded.getAttribute = () => 'exclude';
+    const excludedText = new FakeText('Copy');
+    excludedText.parentElement = excluded;
+    excluded.childNodes = [excludedText];
+    const visible = new FakeText('hello');
+    visible.parentElement = container;
+    container.childNodes = [excluded, visible];
+
+    await expect(extractFormattedText(container as unknown as Element)).resolves.toBe('hello');
+  } finally {
+    Object.assign(globalThis, { Element: originalElement, Node: originalNode });
+  }
+});
+
+test('skips sr-only subtrees', async () => {
+  const originalElement = globalThis.Element;
+  const originalNode = globalThis.Node;
+  Object.assign(globalThis, { Element: FakeElement, Node: { TEXT_NODE: 3 } });
+
+  try {
+    const container = new FakeElement('DIV');
+    const hidden = new FakeElement('H4');
+    hidden.classList = { contains: () => true };
+    const hiddenText = new FakeText('ChatGPT said:');
+    hiddenText.parentElement = hidden;
+    hidden.childNodes = [hiddenText];
+    const visible = new FakeText('hello');
+    visible.parentElement = container;
+    container.childNodes = [hidden, visible];
+
+    await expect(extractFormattedText(container as unknown as Element)).resolves.toBe('hello');
+  } finally {
+    Object.assign(globalThis, { Element: originalElement, Node: originalNode });
+  }
+});
+
 test('separates list items and blocks with newlines', async () => {
   const originalElement = globalThis.Element;
   const originalNode = globalThis.Node;
