@@ -36,7 +36,7 @@ export function createExportButton(): HTMLElement {
   } else {
     // match ChatGPT's toolbar buttons (Share, ...)
     button.className =
-      'no-drag cursor-interaction items-center select-none whitespace-nowrap flex border border-transparent gap-1 rounded-lg text-(--color-text-toolbar-action) hover:bg-primary-ghost-hover button-toolbar py-0 text-sm leading-[18px]';
+      'no-drag cursor-interaction items-center select-none whitespace-nowrap inline-flex border border-transparent gap-1 rounded-lg text-(--color-text-toolbar-action) hover:bg-primary-ghost-hover button-toolbar py-0 text-sm leading-[18px]';
     // keep the wrapper out of layout so the button sits inline with the
     // header actions instead of stacking on its own row
     buttonContainer.style.display = 'contents';

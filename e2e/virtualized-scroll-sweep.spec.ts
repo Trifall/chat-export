@@ -25,11 +25,16 @@ class MockElement {
     }
     return false;
   }
+
+  getBoundingClientRect(): { top: number } {
+    return { top: this.id * 100 };
+  }
 }
 
 class MockScrollContainer extends MockElement {
   readonly scrollHeight = 5000;
   readonly clientHeight = 300;
+  readonly style = { scrollBehavior: '' };
   scrollTop = 1250;
 
   scrollTo(options: { top: number }): void {
@@ -83,6 +88,110 @@ test('orders collected rows by logical index with encounter fallback', () => {
   ]);
 
   expect(values).toEqual(['head', 'tail', 'unkeyed']);
+});
+
+test('processes rows in visual order when the DOM order is scrambled', async () => {
+  const scroller = new MockScrollContainer(-1, null);
+  scroller.scrollTop = 0;
+  const rows = [3, 1, 4, 0, 2].map((id) => new MockElement(id, null));
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalGetComputedStyle = globalThis.getComputedStyle;
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+
+  Object.assign(globalThis, {
+    document: { scrollingElement: scroller, documentElement: scroller },
+    window: { innerHeight: 300 },
+    getComputedStyle: () => ({ overflowY: 'auto' }),
+    requestAnimationFrame: (callback: FrameRequestCallback) => {
+      callback(0);
+      return 0;
+    },
+  });
+
+  try {
+    const processed: number[] = [];
+    const scrollTops: number[] = [];
+    const failed = await sweepMountedElements(
+      () => [...rows] as unknown as Element[],
+      (element) => String((element as unknown as MockElement).id),
+      async (element, info) => {
+        processed.push((element as unknown as MockElement).id);
+        scrollTops.push(info.scrollTop);
+        return true;
+      },
+      (error) => {
+        throw error;
+      }
+    );
+
+    expect(failed).toBe(0);
+    expect(processed).toEqual([0, 1, 2, 3, 4]);
+    expect(scrollTops).toEqual([0, 0, 0, 0, 0]);
+  } finally {
+    Object.assign(globalThis, {
+      document: originalDocument,
+      window: originalWindow,
+      getComputedStyle: originalGetComputedStyle,
+      requestAnimationFrame: originalRequestAnimationFrame,
+    });
+  }
+});
+
+class DriftingScrollContainer extends MockScrollContainer {
+  scrollToCalls = 0;
+
+  scrollTo(options: { top: number }): void {
+    this.scrollToCalls++;
+    this.scrollTop = options.top + 5;
+  }
+}
+
+test('proceeds without spinning when the container never settles', async () => {
+  const scroller = new DriftingScrollContainer(-1, null);
+  scroller.scrollTop = 0;
+  (scroller as { scrollHeight: number }).scrollHeight = 1000;
+  const rows = [0, 1, 2, 3, 4].map((id) => new MockElement(id, null));
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalGetComputedStyle = globalThis.getComputedStyle;
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+
+  Object.assign(globalThis, {
+    document: { scrollingElement: scroller, documentElement: scroller },
+    window: { innerHeight: 300 },
+    getComputedStyle: () => ({ overflowY: 'auto' }),
+    requestAnimationFrame: (callback: FrameRequestCallback) => {
+      callback(0);
+      return 0;
+    },
+  });
+
+  try {
+    const processed: number[] = [];
+    const failed = await sweepMountedElements(
+      () => [...rows] as unknown as Element[],
+      (element) => String((element as unknown as MockElement).id),
+      async (element) => {
+        processed.push((element as unknown as MockElement).id);
+        return true;
+      },
+      (error) => {
+        throw error;
+      }
+    );
+
+    expect(failed).toBe(0);
+    expect(processed).toEqual([0, 1, 2, 3, 4]);
+    expect(scroller.scrollToCalls).toBeLessThan(30);
+  } finally {
+    Object.assign(globalThis, {
+      document: originalDocument,
+      window: originalWindow,
+      getComputedStyle: originalGetComputedStyle,
+      requestAnimationFrame: originalRequestAnimationFrame,
+    });
+  }
 });
 
 test('captures every virtualized row and restores the scroll position', async () => {

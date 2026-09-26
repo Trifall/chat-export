@@ -1,7 +1,19 @@
 import { formatImageInput } from '@/modules/content-handlers';
 import { extractFormattedText } from '@/modules/content-handlers';
-import { SweepOrderedValue, orderSweepValues, sweepMountedElements } from '@/modules/scroll-sweep';
+import {
+  SweepElementInfo,
+  SweepOrderedValue,
+  orderSweepValues,
+  sweepDebugLog,
+  sweepMountedElements,
+} from '@/modules/scroll-sweep';
 import { Message } from '@/modules/types';
+
+export function isFaviconImage(src: string): boolean {
+  // Source pills render favicons from varying hosts
+  // (google.com/s2/favicons, t0.gstatic.com/faviconV2, ...).
+  return src.toLowerCase().includes('favicon');
+}
 
 async function extractChatGPTMessageContent(
   messageElement: Element,
@@ -12,7 +24,7 @@ async function extractChatGPTMessageContent(
   const images = messageElement.querySelectorAll('img');
   for (const image of images) {
     // skip favicon images which are used for sources
-    if (image.src.includes('google.com/s2/favicons')) continue;
+    if (isFaviconImage(image.src)) continue;
 
     const imageContent = formatImageInput(image.src, image.alt, role);
     content += imageContent + '\n';
@@ -60,7 +72,7 @@ async function extractChatGPTMessageContent(
   }
 
   for (const image of contentClone.querySelectorAll('img')) {
-    if (image.src.includes('google.com/s2/favicons')) {
+    if (isFaviconImage(image.src)) {
       const sourceContainer = image.closest('div');
       if (sourceContainer) {
         sourceContainers.add(sourceContainer);
@@ -126,19 +138,89 @@ function getChatGPTMessageElements(): Element[] {
   return [...messages, ...units];
 }
 
+const CHATGPT_UNIT_SELECTOR =
+  '[data-chatgpt-search-message-ids], [data-chatgpt-search-unit-key], [data-content-search-unit-key]';
+
+function getChatGPTUnitKey(unit: Element | null): string | null {
+  return (
+    unit?.getAttribute('data-chatgpt-search-message-ids') ??
+    unit?.getAttribute('data-chatgpt-search-unit-key') ??
+    unit?.getAttribute('data-content-search-unit-key') ??
+    null
+  );
+}
+
+function getChatGPTMessageId(element: Element | null): string | null {
+  return element?.getAttribute('data-message-id') ?? null;
+}
+
 export function getChatGPTMessageOrder(element: Element): number | null {
-  const unit = element.closest('[data-chatgpt-search-unit-key]');
-  const match = (unit?.getAttribute('data-chatgpt-search-unit-key') || '').match(/turn-(\d+)/);
+  const key = getChatGPTUnitKey(element.closest(CHATGPT_UNIT_SELECTOR)) || '';
+  const match = key.match(/turn-(\d+)/);
   return match ? Number.parseInt(match[1], 10) : null;
 }
 
 export function getChatGPTMessageKey(element: Element): string | null {
   const role = getChatGPTMessageRole(element);
-  const unit = element.closest('[data-chatgpt-search-message-ids], [data-chatgpt-search-unit-key]');
   const ids =
-    unit?.getAttribute('data-chatgpt-search-message-ids') ??
-    unit?.getAttribute('data-chatgpt-search-unit-key');
+    getChatGPTUnitKey(element.closest(CHATGPT_UNIT_SELECTOR)) ?? getChatGPTMessageId(element);
   return role && ids ? `${ids}:${role}` : null;
+}
+
+function findSameTurn(element: Element): Element | null {
+  const testid = element.getAttribute('data-testid');
+  if (testid) {
+    try {
+      return document.querySelector(`[data-testid="${CSS.escape(testid)}"]`);
+    } catch {
+      return null;
+    }
+  }
+  const messageId = getChatGPTMessageId(element);
+  if (messageId) {
+    try {
+      return document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+    } catch {
+      return null;
+    }
+  }
+  for (const name of [
+    'data-chatgpt-search-message-ids',
+    'data-chatgpt-search-unit-key',
+    'data-content-search-unit-key',
+  ]) {
+    const value = element.getAttribute(name) ?? element.closest(`[${name}]`)?.getAttribute(name);
+    if (!value) continue;
+    try {
+      const found = document.querySelector(`[${name}="${CSS.escape(value)}"]`);
+      if (found) return found;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+export function getChatGPTRowTop(element: Element, scrollTop: number): number {
+  try {
+    return (element.getBoundingClientRect?.()?.top ?? 0) + scrollTop;
+  } catch {
+    return scrollTop;
+  }
+}
+
+export function estimateOrderFromSiblings(element: Element, siblings: Element[]): number | null {
+  const index = siblings.indexOf(element);
+  if (index === -1) return null;
+  for (let before = index - 1; before >= 0; before--) {
+    const order = getChatGPTMessageOrder(siblings[before]);
+    if (order !== null) return order + 0.5;
+  }
+  for (let after = index + 1; after < siblings.length; after++) {
+    const order = getChatGPTMessageOrder(siblings[after]);
+    if (order !== null) return order - 0.5;
+  }
+  return null;
 }
 
 function findThinkingLabel(assistantElement: Element): string | null {
@@ -164,18 +246,50 @@ export const getChatGPTChatContent = async () => {
   const failedChatgptMessages = await sweepMountedElements(
     () => getChatGPTMessageElements().filter((element) => getChatGPTMessageRole(element) !== null),
     getChatGPTMessageKey,
-    async (element) => {
-      const message = await extractChatGPTMessage(element);
-      if (!message) return false;
-      collectedMessages.push({
-        order: getChatGPTMessageOrder(element),
-        sequence: sequence++,
-        value: message,
+    async (element, info: SweepElementInfo) => {
+      // Virtualized rows are absolutely positioned, so DOM order is
+      // meaningless. The absolute vertical position is the conversation order.
+      const resolveOrder = (target: Element): number | null =>
+        getChatGPTMessageOrder(target) ??
+        estimateOrderFromSiblings(target, getChatGPTMessageElements()) ??
+        getChatGPTRowTop(target, info.scrollTop);
+      const first = await extractChatGPTMessage(element);
+      if (first) {
+        const order = resolveOrder(element);
+        sweepDebugLog('chatgpt row', {
+          key: getChatGPTMessageKey(element),
+          order,
+          chars: first.content.length,
+        });
+        collectedMessages.push({ order, sequence: sequence++, value: first });
+        return true;
+      }
+      sweepDebugLog('chatgpt row empty, retrying', { key: getChatGPTMessageKey(element) });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const fresh = findSameTurn(element) ?? (element.isConnected ? element : null);
+      if (!fresh) return false;
+      const second = await extractChatGPTMessage(fresh);
+      if (!second) {
+        sweepDebugLog('chatgpt row empty after retry', { key: getChatGPTMessageKey(fresh) });
+        return false;
+      }
+      const order = resolveOrder(fresh);
+      sweepDebugLog('chatgpt row', {
+        key: getChatGPTMessageKey(fresh),
+        order,
+        chars: second.content.length,
       });
+      collectedMessages.push({ order, sequence: sequence++, value: second });
       return true;
     },
     (error) => console.error('Failed to extract message content:', error)
   );
 
-  return { chatgptMessages: orderSweepValues(collectedMessages), failedChatgptMessages };
+  const chatgptMessages = orderSweepValues(collectedMessages);
+  sweepDebugLog('chatgpt done', {
+    rows: chatgptMessages.length,
+    chars: chatgptMessages.reduce((total, message) => total + message.content.length, 0),
+    failed: failedChatgptMessages,
+  });
+  return { chatgptMessages, failedChatgptMessages };
 };
