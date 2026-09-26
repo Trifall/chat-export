@@ -10,6 +10,12 @@ export async function extractFormattedText(element: Element): Promise<string> {
         if (node.getAttribute('aria-hidden') === 'true') {
           return;
         }
+        if (node.classList?.contains('sr-only')) {
+          return;
+        }
+        if (node.getAttribute('data-markdown-copy') === 'exclude') {
+          return;
+        }
         if (
           node.querySelector('svg[aria-label="Sources"]') ||
           node.textContent?.trim() === 'Sources' ||
@@ -64,6 +70,11 @@ export async function extractFormattedText(element: Element): Promise<string> {
             extractText(child, true);
           }
         }
+      } else if (
+        node instanceof Element &&
+        node.getAttribute('data-markdown-copy') === 'code-block'
+      ) {
+        appendMarkdownCodeBlock(node);
       } else if (node.nodeName === 'TABLE') {
         appendMarkdownTable(node as Element);
       } else if (node.nodeName === 'P') {
@@ -168,6 +179,16 @@ export async function extractFormattedText(element: Element): Promise<string> {
 
       appendInlineText(cell);
       return parts.join('').replace(/\s+/g, ' ').trim().replace(/\|/g, '\\|');
+    }
+
+    function appendMarkdownCodeBlock(block: Element): void {
+      const header = block.querySelector('[data-markdown-copy="exclude"]');
+      const label =
+        (header?.querySelector('.truncate') ?? header)?.textContent?.trim().replace(/\s+/g, ' ') ||
+        '';
+      const code = block.querySelector('code');
+      const codeContent = code ? getCodeBlockContent(code) : '';
+      formattedText += `\n\`\`\`${label}\n${codeContent}\n\`\`\`\n`;
     }
 
     function appendMarkdownTable(table: Element): void {

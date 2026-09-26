@@ -4,6 +4,22 @@ export interface SweepOrderedValue<T> {
   value: T;
 }
 
+export function isSweepDebugEnabled(): boolean {
+  try {
+    const search = window.location.search || '';
+    if (new URLSearchParams(search).get('chat-export-debug') === '1') return true;
+    return window.localStorage?.getItem('chat-export-debug') === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function sweepDebugLog(...args: unknown[]): void {
+  if (isSweepDebugEnabled()) {
+    console.debug('[chat-export-sweep]', ...args);
+  }
+}
+
 export function orderSweepValues<T>(items: Array<SweepOrderedValue<T>>): Array<T> {
   return [...items]
     .sort(
@@ -14,10 +30,14 @@ export function orderSweepValues<T>(items: Array<SweepOrderedValue<T>>): Array<T
     .map((item) => item.value);
 }
 
+export interface SweepElementInfo {
+  scrollTop: number;
+}
+
 export async function sweepMountedElements(
   getElements: () => Element[],
   getKey: (element: Element) => string | null,
-  processElement: (element: Element) => Promise<boolean>,
+  processElement: (element: Element, info: SweepElementInfo) => Promise<boolean>,
   onError: (error: unknown) => void
 ): Promise<number> {
   const waitForRender = (delay = 100) =>
@@ -30,15 +50,7 @@ export async function sweepMountedElements(
   const scrollerHeight = (scrollContainer: HTMLElement) =>
     scrollContainer.clientHeight || window.innerHeight;
 
-  const isDebugLoggingEnabled = () => {
-    try {
-      const search = window.location.search || '';
-      if (new URLSearchParams(search).get('chat-export-debug') === '1') return true;
-      return window.localStorage?.getItem('chat-export-debug') === '1';
-    } catch {
-      return false;
-    }
-  };
+  const isDebugLoggingEnabled = () => isSweepDebugEnabled();
 
   const describeElement = (element: Element | null) => {
     if (!element || typeof (element as HTMLElement).tagName !== 'string') return null;
@@ -108,18 +120,73 @@ export async function sweepMountedElements(
   const getElementKey = (element: Element) => getKey(element) ?? element;
   const describeKey = (key: string | Element) =>
     typeof key === 'string' ? key : 'unkeyed-element';
+  const mountedKeys = (): Set<string | Element> =>
+    new Set(
+      getElements()
+        .filter((candidate) => candidate.isConnected)
+        .map(getElementKey)
+    );
+  const sameKeySet = (first: Set<string | Element>, second: Set<string | Element>): boolean => {
+    if (first.size !== second.size) return false;
+    for (const key of first) {
+      if (!second.has(key)) return false;
+    }
+    return true;
+  };
+  const settleScroll = async (target: number): Promise<void> => {
+    // A fighting virtualizer or scroll anchoring can keep scrollTop off
+    // target forever. Never spin here: a few attempts, then proceed like a
+    // normal scroll wait so a full sweep stays seconds, not minutes.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (Math.abs(scrollContainer.scrollTop - target) <= 1) return;
+      scrollToPosition(scrollContainer, target);
+      await waitForRender(attempt === 0 ? 100 : 0);
+    }
+  };
+  // Virtualizers can re-mount rows in scrambled DOM order (e.g. after a big
+  // jump). Follow visual order instead: within one scan every mounted row
+  // shares the same scroll position, so viewport-relative tops are comparable.
+  const visualTop = (candidate: Element): number => {
+    try {
+      return candidate.getBoundingClientRect()?.top ?? 0;
+    } catch {
+      return 0;
+    }
+  };
   let failed = 0;
   let position = 0;
   let maxScroll = 0;
+  let turnoverDone = false;
+
+  const scrollerStyle = scrollContainer.style;
+  const previousScrollBehavior = scrollerStyle.scrollBehavior;
+  const documentStyle = document.documentElement.style;
+  const previousDocumentScrollBehavior = documentStyle.scrollBehavior;
+  scrollerStyle.scrollBehavior = 'auto';
+  documentStyle.scrollBehavior = 'auto';
 
   try {
     while (true) {
       maxScroll = Math.max(maxScroll, scrollContainer.scrollHeight - scrollContainer.clientHeight);
       position = Math.min(position, maxScroll);
 
+      if (position === 0 && !turnoverDone) {
+        turnoverDone = true;
+        const startedAtTop = Math.abs(scrollContainer.scrollTop) <= 1;
+        const initialKeys = mountedKeys();
+        await settleScroll(0);
+        if (!startedAtTop && scrollContainer.scrollHeight > scrollContainer.clientHeight * 3) {
+          for (let attempt = 0; attempt < 10; attempt++) {
+            await waitForRender();
+            if (!sameKeySet(mountedKeys(), initialKeys)) break;
+          }
+        }
+      }
+
       while (true) {
-        if (scrollContainer.scrollTop !== position) {
-          scrollToPosition(scrollContainer, position);
+        if (Math.abs(scrollContainer.scrollTop - position) > 1) {
+          await settleScroll(position);
+        } else {
           await waitForRender();
         }
 
@@ -135,13 +202,18 @@ export async function sweepMountedElements(
             ? describeKey(getElementKey(pendingRows[pendingRows.length - 1]))
             : null,
         });
-        const element = pendingRows[0];
+        const element = [...pendingRows].sort(
+          (first, second) => visualTop(first) - visualTop(second)
+        )[0];
         if (!element) break;
 
         seen.add(getElementKey(element));
-        debugLog('process row', { key: describeKey(getElementKey(element)) });
+        debugLog('process row', {
+          key: describeKey(getElementKey(element)),
+          top: visualTop(element),
+        });
         try {
-          if (!(await processElement(element))) failed++;
+          if (!(await processElement(element, { scrollTop: scrollContainer.scrollTop }))) failed++;
         } catch (error) {
           failed++;
           onError(error);
@@ -211,6 +283,8 @@ export async function sweepMountedElements(
       await waitForRender(200);
       if (Math.abs(restoreTarget.scrollTop - originalScrollTop) <= 1) break;
     }
+    scrollerStyle.scrollBehavior = previousScrollBehavior;
+    documentStyle.scrollBehavior = previousDocumentScrollBehavior;
   }
 
   return failed;

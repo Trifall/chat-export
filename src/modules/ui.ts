@@ -34,9 +34,9 @@ export function createExportButton(): HTMLElement {
     iconSpan.textContent = 'download';
     button.appendChild(iconSpan);
   } else {
-    // match ChatGPT's ghost header buttons (Share, ...)
+    // match ChatGPT's toolbar buttons (Share, ...)
     button.className =
-      'btn relative btn-ghost keyboard-focused:bg-token-surface-hover text-token-text-primary hover:bg-token-surface-hover rounded-lg max-sm:hidden';
+      'no-drag cursor-interaction items-center select-none whitespace-nowrap inline-flex border border-transparent gap-1 rounded-lg text-(--color-text-toolbar-action) hover:bg-primary-ghost-hover button-toolbar py-0 text-sm leading-[18px]';
     // keep the wrapper out of layout so the button sits inline with the
     // header actions instead of stacking on its own row
     buttonContainer.style.display = 'contents';
@@ -53,8 +53,8 @@ export function createExportButton(): HTMLElement {
     if (site !== 'claude') {
       const svgNamespace = 'http://www.w3.org/2000/svg';
       const icon = document.createElementNS(svgNamespace, 'svg');
-      icon.setAttribute('width', '20');
-      icon.setAttribute('height', '20');
+      icon.setAttribute('width', '16');
+      icon.setAttribute('height', '16');
       icon.setAttribute('viewBox', '0 0 20 20');
       icon.setAttribute('fill', 'none');
       icon.setAttribute('stroke', 'currentColor');
