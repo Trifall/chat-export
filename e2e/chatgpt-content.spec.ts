@@ -1,7 +1,5 @@
 import {
-  estimateOrderFromSiblings,
   getChatGPTMessageKey,
-  getChatGPTMessageOrder,
   getChatGPTMessageRole,
   getChatGPTRowTop,
   isFaviconImage,
@@ -63,30 +61,10 @@ test('detects new ChatGPT message roles', () => {
   expect(getChatGPTMessageRole(fakeChatElement({}))).toBeNull();
 });
 
-test('orders ChatGPT messages by search unit turn', () => {
-  expect(getChatGPTMessageOrder(fakeChatElement({ unitKey: 'fallback-turn-0:2:assistant' }))).toBe(
-    0
-  );
-  expect(getChatGPTMessageOrder(fakeChatElement({ unitKey: 'fallback-turn-12:0:user' }))).toBe(12);
-  expect(getChatGPTMessageOrder(fakeChatElement({}))).toBeNull();
-});
-
-test('falls back to the content search unit key', () => {
-  expect(getChatGPTMessageOrder(fakeChatElement({ contentKey: 'fallback-turn-7:1:user' }))).toBe(7);
+test('keys ChatGPT messages by content search unit key', () => {
   expect(
     getChatGPTMessageKey(fakeChatElement({ bubble: true, contentKey: 'fallback-turn-7:1:user' }))
   ).toBe('fallback-turn-7:1:user:user');
-});
-
-test('interpolates order from co-mounted neighbors', () => {
-  const ordered = (turn: number) =>
-    fakeChatElement({ bubble: true, unitKey: `fallback-turn-${turn}:0:user` });
-  const unkeyed = fakeChatElement({ bubble: true });
-  const siblings = [ordered(3), unkeyed, ordered(5)];
-
-  expect(estimateOrderFromSiblings(unkeyed, siblings)).toBe(3.5);
-  expect(estimateOrderFromSiblings(unkeyed, [unkeyed])).toBeNull();
-  expect(estimateOrderFromSiblings(fakeChatElement({ bubble: true }), [])).toBeNull();
 });
 
 test('recognizes favicon images from any host', () => {
@@ -105,6 +83,12 @@ test('measures ChatGPT rows by absolute top', () => {
   expect(getChatGPTRowTop(fakeChatElement({ top: 1518 }), 13762)).toBe(15280);
   expect(getChatGPTRowTop(fakeChatElement({}), 0)).toBe(0);
   expect(getChatGPTRowTop({} as Element, 100)).toBe(100);
+});
+
+test('ignores turn metadata when measuring row position', () => {
+  expect(
+    getChatGPTRowTop(fakeChatElement({ unitKey: 'fallback-turn-0:2:assistant', top: 500 }), -250000)
+  ).toBe(-249500);
 });
 
 test('keys ChatGPT messages by unit and role', () => {

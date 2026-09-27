@@ -12,7 +12,15 @@ export async function getChatContent(restoreClipboard: boolean = false): Promise
   const site = detectSite();
   const messages: Array<Message> = [];
   let failedMessages = 0;
-  const originalClipboard = restoreClipboard ? await navigator.clipboard.readText() : null;
+  let originalClipboard: string | null = null;
+  if (restoreClipboard) {
+    // Best effort: losing focus mid-export must not kill the whole run.
+    try {
+      originalClipboard = await navigator.clipboard.readText();
+    } catch {
+      originalClipboard = null;
+    }
+  }
 
   if (site === 'chatgpt') {
     const { chatgptMessages, failedChatgptMessages } = await getChatGPTChatContent();
@@ -34,7 +42,11 @@ export async function getChatContent(restoreClipboard: boolean = false): Promise
 
   // restore original clipboard content
   if (originalClipboard !== null) {
-    await navigator.clipboard.writeText(originalClipboard);
+    try {
+      await navigator.clipboard.writeText(originalClipboard);
+    } catch (error) {
+      console.warn('Could not restore clipboard content:', error);
+    }
   }
 
   const formattedContent = await formatContent(messages, format);

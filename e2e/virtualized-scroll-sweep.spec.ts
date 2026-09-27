@@ -2,7 +2,14 @@ import {
   extractAllClaudePastedContent,
   getPastedBlockTarget,
 } from '../src/modules/claude/pasted-content';
-import { orderSweepValues, sweepMountedElements } from '../src/modules/scroll-sweep';
+import {
+  detectScrollDirectionMode,
+  estimatePrependGrowth,
+  fromNativeScrollTop,
+  orderSweepValues,
+  sweepMountedElements,
+  toNativeScrollTop,
+} from '../src/modules/scroll-sweep';
 import { expect, test } from '@playwright/test';
 
 class MockElement {
@@ -78,6 +85,69 @@ test('uses the button wrapping a pasted thumbnail', () => {
   } as unknown as Element;
 
   expect(getPastedBlockTarget(flexCol, messageContainer)).toBe(button);
+});
+
+test('converts scroll positions for normal and reversed containers', () => {
+  expect(toNativeScrollTop(100, 500, 'normal')).toBe(100);
+  expect(fromNativeScrollTop(100, 500, 'normal')).toBe(100);
+  expect(toNativeScrollTop(100, 500, 'negative-reverse')).toBe(-400);
+  expect(fromNativeScrollTop(-400, 500, 'negative-reverse')).toBe(100);
+  expect(toNativeScrollTop(100, 500, 'positive-reverse')).toBe(400);
+  expect(fromNativeScrollTop(400, 500, 'positive-reverse')).toBe(100);
+  expect(toNativeScrollTop(0, 500, 'negative-reverse')).toBe(-500);
+  expect(toNativeScrollTop(0, 0, 'negative-reverse')).toBe(0);
+});
+
+test('attributes layout growth to prepends only with matching scroll shift', () => {
+  expect(estimatePrependGrowth(10000, -10000)).toBe(10000);
+  expect(estimatePrependGrowth(10000, 10000)).toBe(10000);
+  expect(estimatePrependGrowth(10000, 9950)).toBe(10000);
+  expect(estimatePrependGrowth(500, 0)).toBe(0);
+  expect(estimatePrependGrowth(0, -500)).toBe(0);
+  expect(estimatePrependGrowth(-200, -200)).toBe(0);
+  expect(estimatePrependGrowth(100, -50)).toBe(0);
+});
+
+function reverseContainerMock(clamp: (value: number) => number): HTMLElement {
+  let top = 0;
+  return {
+    get scrollTop() {
+      return top;
+    },
+    set scrollTop(value: number) {
+      top = clamp(value);
+    },
+  } as unknown as HTMLElement;
+}
+
+test('detects scroll direction conventions empirically', () => {
+  const originalGetComputedStyle = globalThis.getComputedStyle;
+  Object.assign(globalThis, { getComputedStyle: () => ({ flexDirection: 'column-reverse' }) });
+  try {
+    // Blink/WebKit: negative values stick.
+    expect(detectScrollDirectionMode(reverseContainerMock((value) => value))).toBe(
+      'negative-reverse'
+    );
+    // Gecko: negatives clamp to zero, positives stick.
+    expect(detectScrollDirectionMode(reverseContainerMock((value) => Math.max(0, value)))).toBe(
+      'positive-reverse'
+    );
+    // Unscrollable: nothing sticks.
+    expect(detectScrollDirectionMode(reverseContainerMock(() => 0))).toBe('normal');
+  } finally {
+    Object.assign(globalThis, { getComputedStyle: originalGetComputedStyle });
+  }
+});
+
+test('treats non-reversed containers as normal', () => {
+  const originalGetComputedStyle = globalThis.getComputedStyle;
+  Object.assign(globalThis, { getComputedStyle: () => ({ flexDirection: 'column' }) });
+  try {
+    expect(detectScrollDirectionMode(reverseContainerMock((value) => value))).toBe('normal');
+  } finally {
+    Object.assign(globalThis, { getComputedStyle: originalGetComputedStyle });
+  }
+  expect(detectScrollDirectionMode({} as HTMLElement)).toBe('normal');
 });
 
 test('orders collected rows by logical index with encounter fallback', () => {

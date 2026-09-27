@@ -154,12 +154,6 @@ function getChatGPTMessageId(element: Element | null): string | null {
   return element?.getAttribute('data-message-id') ?? null;
 }
 
-export function getChatGPTMessageOrder(element: Element): number | null {
-  const key = getChatGPTUnitKey(element.closest(CHATGPT_UNIT_SELECTOR)) || '';
-  const match = key.match(/turn-(\d+)/);
-  return match ? Number.parseInt(match[1], 10) : null;
-}
-
 export function getChatGPTMessageKey(element: Element): string | null {
   const role = getChatGPTMessageRole(element);
   const ids =
@@ -209,20 +203,6 @@ export function getChatGPTRowTop(element: Element, scrollTop: number): number {
   }
 }
 
-export function estimateOrderFromSiblings(element: Element, siblings: Element[]): number | null {
-  const index = siblings.indexOf(element);
-  if (index === -1) return null;
-  for (let before = index - 1; before >= 0; before--) {
-    const order = getChatGPTMessageOrder(siblings[before]);
-    if (order !== null) return order + 0.5;
-  }
-  for (let after = index + 1; after < siblings.length; after++) {
-    const order = getChatGPTMessageOrder(siblings[after]);
-    if (order !== null) return order - 0.5;
-  }
-  return null;
-}
-
 function findThinkingLabel(assistantElement: Element): string | null {
   let sibling = assistantElement.previousElementSibling;
   for (let depth = 0; depth < 5 && sibling; depth++) {
@@ -248,11 +228,14 @@ export const getChatGPTChatContent = async () => {
     getChatGPTMessageKey,
     async (element, info: SweepElementInfo) => {
       // Virtualized rows are absolutely positioned, so DOM order is
-      // meaningless. The absolute vertical position is the conversation order.
-      const resolveOrder = (target: Element): number | null =>
-        getChatGPTMessageOrder(target) ??
-        estimateOrderFromSiblings(target, getChatGPTMessageElements()) ??
-        getChatGPTRowTop(target, info.scrollTop);
+      // meaningless. The absolute vertical position is the conversation
+      // order, rebased onto the sweep-start origin: segments that load
+      // mid-sweep would otherwise shift every later measurement.
+      // Deliberately no turn-number ordering: turn metadata only exists on
+      // some segments, and its small values sort before/after geometric
+      // positions depending on scroll convention, scrambling the thread.
+      const resolveOrder = (target: Element): number =>
+        getChatGPTRowTop(target, info.scrollTop) + info.prependOffset;
       const first = await extractChatGPTMessage(element);
       if (first) {
         const order = resolveOrder(element);
@@ -282,7 +265,11 @@ export const getChatGPTChatContent = async () => {
       collectedMessages.push({ order, sequence: sequence++, value: second });
       return true;
     },
-    (error) => console.error('Failed to extract message content:', error)
+    (error) => console.error('Failed to extract message content:', error),
+    {
+      preloadHistory: true,
+      isLoadingMore: () => document.body.textContent?.includes('Loading older messages') ?? false,
+    }
   );
 
   const chatgptMessages = orderSweepValues(collectedMessages);
